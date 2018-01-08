@@ -78,10 +78,10 @@ for i in range(NVIEWS):
 
 	outputs = net(dataset_test)
 	loss = criterion(outputs, dataset_test)
-	print("View " + str (i) + " - test loss : " + str(loss.data[0]))
+	print("\ttest loss : " + str(loss.data[0]))
 
 	models.append(net)
-	print("Encoding training and test dataset...")
+	print("Encoding training and test dataset...\n")
 	# Codes gathering
 	code = net.encode(dataset)
 	code = Variable(code.data, requires_grad = False)
@@ -142,9 +142,11 @@ for i in range(NVIEWS):
 
 			outputs = net(data_test_in)
 			loss = criterion(outputs, data_test_out)
-			print("Link " + str(i) + " ~ " + str(j) + " - test loss : " + str(loss.data[0]))
+			print("\ttest loss : " + str(loss.data[0]))
 
 			links[i].append(net)
+
+print("\n")
 
 # TESTING THE RECONSTRUCTION
 for i in range(NVIEWS):
