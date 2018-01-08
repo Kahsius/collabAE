@@ -2,9 +2,10 @@ import torch.optim as optim
 import pandas as pd
 import numpy as np
 import sys
-import functools as ft
 from sklearn.preprocessing import scale
 from libCollabAE import *
+
+torch.manual_seed(123)
 
 # PARAMETERS
 VERBOSE = False
@@ -12,9 +13,10 @@ VERBOSE = False
 # HYPERPARAMETERS
 PTEST = .1
 NSTEPS = 5000
+NSTEPS_WEIGHTS = 300
 NVIEWS = 3
-LAYERS_AE = [30, 10]
-LAYERS_LINKS = [30, 30]
+LAYERS_AE = [10]
+LAYERS_LINKS = [50]
 LEARNING_RATE_AE = 0.03
 LEARNING_RATE_LINKS = 0.06
 
@@ -28,17 +30,22 @@ np.random.shuffle(data)
 dimData = data.shape[1]
 nData = data.shape[0]
 nTest = int(nData * PTEST)
-print("\nnData : " + str(nData))
-print("nTest : " + str(nTest))
 
 # TRAIN AND TEST SETS
 test_data = Variable(torch.from_numpy(data[:nTest,:]).float())
 train_data = Variable(torch.from_numpy(data[nTest:,:]).float())
 
 indexes = getIndexesViews(dimData, NVIEWS)
-print("Indexes : " + str(indexes))
 train_datasets = getViewsFromIndexes(train_data, indexes)
 test_datasets = getViewsFromIndexes(test_data, indexes)
+
+print("\n")
+print("nData : " + str(nData))
+print("Test : " + str(nTest))
+print("dim AE : " + str([dimData] + LAYERS_AE))
+print("dim Links : " + str([LAYERS_AE[-1]] + LAYERS_LINKS + [LAYERS_AE[-1]]))
+print("Indexes : " + str(indexes))
+print("\n")
 
 # LEARNING ALL THE MODELS AND GET THE CODES
 models = list()
@@ -149,19 +156,35 @@ for i in range(NVIEWS):
 print("\n")
 
 # TESTING THE RECONSTRUCTION
+# PROTO WEIGTHING WITH GRAD
+w = torch.FloatTensor(NVIEWS,NVIEWS).zero_()+1/(NVIEWS-1)
+weights = (Variable(w, requires_grad=True))
+optimizer = optim.SGD([weights], lr=LEARNING_RATE_AE)
+criterion = nn.MSELoss()
+
 for i in range(NVIEWS):
-	codes = list()
-	for j in range(NVIEWS):
-		if i != j :
-			code_externe = models[j].encode(test_datasets[j])
-			code_interne = links[j][i](code_externe)
-			codes.append(code_interne)
+	for epoch in range(NSTEPS_WEIGHTS):
+		optimizer.zero_grad()
 
-	code_moyen = ft.reduce(lambda x, y: (x.data+y.data)/(NVIEWS-1), codes)
-	code_moyen = Variable(code_moyen)
+		code_moyen = getWeightedInputCodes(i, models, links, train_datasets, weights)
+		# code_moyen = ft.reduce(lambda x, y: (x.data+y.data)/(NVIEWS-1), codes)
+		indiv_reconstruit = models[i].decode(code_moyen)
+		
+		loss = criterion(indiv_reconstruit, train_datasets[i])
+		loss.backward()
+		optimizer.step()
 
-	indiv_reconstruit = models[i].decode(code_moyen)
-	criterion = nn.MSELoss()
+		if epoch % 100 == 0 and VERBOSE:
+			code_test_moyen = getWeightedInputCodes(i, models, links, test_datasets, weights)
+			indiv_reconstruit = models[i].decode(code_test_moyen)
+			loss = criterion(indiv_reconstruit, test_datasets[i])
+			print("Reconstruction error view " + str(i) + " : " + str(loss.data[0]))
+
+	code_test_moyen = getWeightedInputCodes(i, models, links, test_datasets, weights)
+	indiv_reconstruit = models[i].decode(code_test_moyen)
 	loss = criterion(indiv_reconstruit, test_datasets[i])
-
 	print("Reconstruction error view " + str(i) + " : " + str(loss.data[0]))
+print("\n")
+
+print("Weights")
+print(weights[:,:])
