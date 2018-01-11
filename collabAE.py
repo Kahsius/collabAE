@@ -1,190 +1,89 @@
-import torch.optim as optim
-import pandas as pd
-import numpy as np
-import sys
-from sklearn.preprocessing import scale
 from libCollabAE import *
+from multiprocessing import Pool
 
-torch.manual_seed(123)
+def learnCollabSystem(train_datasets, test_datasets, options) :
 
-# PARAMETERS
-VERBOSE = False
+	inf = float("inf")
+	p = Pool(4)
 
-# HYPERPARAMETERS
-PTEST = .1
-NSTEPS = 5000
-NSTEPS_WEIGHTS = 300
-NVIEWS = 3
-LAYERS_AE = [10]
-LAYERS_LINKS = [50]
-LEARNING_RATE_AE = 0.03
-LEARNING_RATE_LINKS = 0.06
+	# PARAMETERS
+	VERBOSE = options["VERBOSE"]
+	VERBOSE_STEP = options["VERBOSE_STEP"]
+	NVIEWS = len(train_datasets)
 
-# DATA PREPROCESSING
-data = pd.read_csv("data/wdbc.data", header=None).values[:,2:]
-data = np.array(data, dtype='float')
-data = scale(data)
-np.random.shuffle(data)
+	# HYPERPARAMETERS
+	NSTEPS = options["NSTEPS"]
+	NSTEPS_WEIGHTS = options["NSTEPS_WEIGHTS"]
+	LAYERS_AE = options["LAYERS_AE"]
+	LAYERS_LINKS = options["LAYERS_LINKS"]
+	LEARNING_RATE_AE = options["LEARNING_RATE_AE"]
+	LEARNING_RATE_LINKS = options["LEARNING_RATE_LINKS"]
+	LEARNING_RATE_WEIGHTS = options["LEARNING_RATE_WEIGHTS"]
+	MOMENTUM = options["MOMENTUM"]
+	PATIENCE = options["PATIENCE"]
 
-# DATA INFORMATIONS
-dimData = data.shape[1]
-nData = data.shape[0]
-nTest = int(nData * PTEST)
+	# LEARNING ALL THE MODELS AND GET THE CODES
+	args = get_args_to_map_AE(train_datasets, test_datasets, options)
+	models = p.map(learn_AENet, args)
 
-# TRAIN AND TEST SETS
-test_data = Variable(torch.from_numpy(data[:nTest,:]).float())
-train_data = Variable(torch.from_numpy(data[nTest:,:]).float())
+	codes = list()
+	codes_test = list()
+	for i in range(NVIEWS):
+		# Codes gathering
+		code = models[i].encode(train_datasets[i])
+		code = Variable(code.data, requires_grad = False)
+		codes.append(code)
 
-indexes = getIndexesViews(dimData, NVIEWS)
-train_datasets = getViewsFromIndexes(train_data, indexes)
-test_datasets = getViewsFromIndexes(test_data, indexes)
+		code_test = models[i].encode(test_datasets[i])
+		code_test = Variable(code_test.data, requires_grad = False)
+		codes_test.append(code_test)
 
-print("\n")
-print("nData : " + str(nData))
-print("Test : " + str(nTest))
-print("dim AE : " + str([dimData] + LAYERS_AE))
-print("dim Links : " + str([LAYERS_AE[-1]] + LAYERS_LINKS + [LAYERS_AE[-1]]))
-print("Indexes : " + str(indexes))
-print("\n")
+	# LEARNING OF THE LINKS
+	args = get_args_to_map_links(codes, codes_test, options)
+	links_tmp = p.map(learn_LinkNet, args)
+	sys.exit()
 
-# LEARNING ALL THE MODELS AND GET THE CODES
-models = list()
-codes = list()
-codes_test = list()
+	links = list()
+	for i in range(NVIEWS):
+		links.append(list())
+		for j in range(NVIEWS):
+			links[i].append(links_tmp[i*NVIEWS+j])
 
-for i in range(NVIEWS):
-	print("Learning view " + str(i))
-	dataset = train_datasets[i]
-	dataset_test = test_datasets[i]
-	dimData = indexes[i+1] - indexes[i]
+	print("\n")
 
-	# MODEL DEFINITION
-	net = AENet( [dimData] + LAYERS_AE )
+	# TESTING THE RECONSTRUCTION
+	# PROTO WEIGTHING WITH GRAD
+	w = torch.FloatTensor(NVIEWS,NVIEWS).zero_()+1/(NVIEWS-1)
+	weights = (Variable(w, requires_grad=True))
 	criterion = nn.MSELoss()
-	optimizer = optim.SGD(net.parameters(), lr=LEARNING_RATE_AE)
 
-	# LEARNING
-	for epoch in range(NSTEPS):
-
-		if VERBOSE:
-			# Test information
-			outputs = net(dataset_test)
-			loss = criterion(outputs, dataset_test)
-			if epoch % 100 == 0 : 
-				print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
+	for i in range(NVIEWS):
+		print("Reconstruction view " + str(i))
+		optimizer = optim.SGD([weights], lr=LEARNING_RATE_WEIGHTS)
+		scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 		
-		optimizer.zero_grad()
-		
-		# Train information
-		outputs = net(dataset)
-		loss = criterion(outputs, dataset)
+		for epoch in range(NSTEPS_WEIGHTS):
+			optimizer.zero_grad()
 
-		# Parameters optimization
-		loss.backward()
-		optimizer.step()
+			code_moyen = getWeightedInputCodes(i, models, links, train_datasets, weights)
+			indiv_reconstruit = models[i].decode(code_moyen)
+			
+			loss = criterion(indiv_reconstruit, train_datasets[i])
+			loss.backward()
+			optimizer.step()
+			scheduler.step(loss.data[0])
 
-	outputs = net(dataset_test)
-	loss = criterion(outputs, dataset_test)
-	print("\ttest loss : " + str(loss.data[0]))
+			if epoch % VERBOSE_STEP == 0 and VERBOSE:
+				code_test_moyen = getWeightedInputCodes(i, models, links, test_datasets, weights)
+				indiv_reconstruit = models[i].decode(code_test_moyen)
+				loss = criterion(indiv_reconstruit, test_datasets[i])
+				print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
 
-	models.append(net)
-	print("Encoding training and test dataset...\n")
-	# Codes gathering
-	code = net.encode(dataset)
-	code = Variable(code.data, requires_grad = False)
-	codes.append(code)
+		code_test_moyen = getWeightedInputCodes(i, models, links, test_datasets, weights)
+		indiv_reconstruit = models[i].decode(code_test_moyen)
+		loss = criterion(indiv_reconstruit, test_datasets[i])
+		print("\ttest loss : " + str(loss.data[0]))
+		print("\n")
 
-	code_test = net.encode(dataset_test)
-	code_test = Variable(code_test.data, requires_grad = False)
-	codes_test.append(code_test)
-
-# LEARNING OF THE LINKS
-links = list()
-for i in range(NVIEWS):
-	links.append(list())
-
-for i in range(NVIEWS):
-	for j in range(NVIEWS):
-		if i == j :
-			links[i].append([])
-		else :
-
-			# GET THE CODE TO LINK
-			data_in = codes[i]
-			data_out = codes[j]
-
-			data_test_in = codes_test[i]
-			data_test_out = codes_test[j]
-
-			dimData_in = data_in.size()[1]
-			dimData_out = data_out.size()[1]
-
-			# DEFINE THE MODEL
-			print("Link " + str(i) + " ~ " + str(j))
-			net = LinkNet( [dimData_in] + LAYERS_LINKS + [dimData_out] )
-			criterion = nn.MSELoss()
-			optimizer = optim.SGD( net.parameters(), lr=LEARNING_RATE_LINKS)
-
-			# LEARNING
-			for epoch in range(NSTEPS):
-				# Test information
-				if VERBOSE:
-					outputs = net(data_test_in)
-					loss = criterion(outputs, data_test_out)
-					if epoch % 100 == 0 : 
-						print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
-
-				optimizer.zero_grad()
-				
-				# Train information
-				outputs = net(data_in)
-				loss = criterion(outputs, data_out)
-
-				# Parameters optimization
-				loss.backward()
-				optimizer.step()
-
-			# print(net(data_test_in).data[1:10,:])
-			# print(data_test_in.data[1:10,:])
-
-			outputs = net(data_test_in)
-			loss = criterion(outputs, data_test_out)
-			print("\ttest loss : " + str(loss.data[0]))
-
-			links[i].append(net)
-
-print("\n")
-
-# TESTING THE RECONSTRUCTION
-# PROTO WEIGTHING WITH GRAD
-w = torch.FloatTensor(NVIEWS,NVIEWS).zero_()+1/(NVIEWS-1)
-weights = (Variable(w, requires_grad=True))
-optimizer = optim.SGD([weights], lr=LEARNING_RATE_AE)
-criterion = nn.MSELoss()
-
-for i in range(NVIEWS):
-	for epoch in range(NSTEPS_WEIGHTS):
-		optimizer.zero_grad()
-
-		code_moyen = getWeightedInputCodes(i, models, links, train_datasets, weights)
-		# code_moyen = ft.reduce(lambda x, y: (x.data+y.data)/(NVIEWS-1), codes)
-		indiv_reconstruit = models[i].decode(code_moyen)
-		
-		loss = criterion(indiv_reconstruit, train_datasets[i])
-		loss.backward()
-		optimizer.step()
-
-		if epoch % 100 == 0 and VERBOSE:
-			code_test_moyen = getWeightedInputCodes(i, models, links, test_datasets, weights)
-			indiv_reconstruit = models[i].decode(code_test_moyen)
-			loss = criterion(indiv_reconstruit, test_datasets[i])
-			print("Reconstruction error view " + str(i) + " : " + str(loss.data[0]))
-
-	code_test_moyen = getWeightedInputCodes(i, models, links, test_datasets, weights)
-	indiv_reconstruit = models[i].decode(code_test_moyen)
-	loss = criterion(indiv_reconstruit, test_datasets[i])
-	print("Reconstruction error view " + str(i) + " : " + str(loss.data[0]))
-print("\n")
-
-print("Weights")
-print(weights[:,:])
+	print("Weights")
+	print(weights[:,:])
