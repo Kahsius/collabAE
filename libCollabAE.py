@@ -92,12 +92,12 @@ def getViewsFromIndexes(data, indexes):
 
 # =====================================================================
 
-def getWeightedInputCodes(i, models, links, datasets, weights):
+def getWeightedInputCodes(i, codes, links, weights):
 	codes = list()
-	for j in range(len(models)):
+	for j in range(len(codes)):
 		if i != j :
-			code_externe = models[j].encode(datasets[j])
-			code_interne = links[j][i](code_externe)*weights[j,i]
+			code_externe = codes[j]
+			code_interne = links[j][i](code_externe)*weights[j]
 			codes.append(code_interne)
 
 	code_moyen = ft.reduce(lambda x, y: x+y, codes)
@@ -365,4 +365,79 @@ def get_args_to_map_links(codes, codes_test, options):
 			}
 			args.append(dic)
 	return args
+
+# =====================================================================
+
+def learn_weights_code(args):
+	id_view = args["id_view"]
+
+	codes = args["codes"]
+	codes_test = args["codes_test"]
+
+	model = args["model"]
+	links = args["links"]
+
+	train_dataset = args["train_dataset"]
+	test_dataset = args["test_dataset"]
+
+	options = args["options"]
+
+	NVIEWS = len(codes)
+
+	# TESTING THE RECONSTRUCTION
+	# PROTO WEIGTHING WITH GRAD
+	w = torch.FloatTensor(NVIEWS).zero_()+1/(NVIEWS-1)
+	weights = (Variable(w, requires_grad=True))
+	criterion = nn.MSELoss()
+
+	print("Reconstruction view " + str(id_view))
+	optimizer = optim.SGD([weights], lr=options["LEARNING_RATE_WEIGHTS"])
+	scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+	
+	for epoch in range(options["NSTEPS_WEIGHTS"]):
+		optimizer.zero_grad()
+
+		code_moyen = getWeightedInputCodes(id_view, codes, links, weights)
+		indiv_reconstruit = models[id_view].decode(code_moyen)
+		
+		loss = criterion(indiv_reconstruit, train_dataset)
+		loss.backward()
+		optimizer.step()
+		scheduler.step(loss.data[0])
+
+		if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"]:
+			code_test_moyen = getWeightedInputCodes(id_view, codes_test, links, weights)
+			indiv_reconstruit = models[id_view].decode(code_test_moyen)
+			loss = criterion(indiv_reconstruit, test_dataset)
+			print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
+
+	code_test_moyen = getWeightedInputCodes(id_view, codes_test, links, weights)
+	indiv_reconstruit = model.decode(code_test_moyen)
+	loss = criterion(indiv_reconstruit, test_dataset)
+	print("\ttest loss : " + str(loss.data[0]))
+	print("\n")
+
+	print("Weights view " + str(id_view))
+	print(weights[:,:])
+	return(weights)
+
+# =====================================================================
+
+def get_args_to_map_weights(train_datasets, test_datasets, models, links, codes, codes_test, options):
+	NVIEWS = len(train_datasets)
+	args = list()
+	for i in range(NVIEWS):
+		dic = {
+			"id_view" : i,
+			"codes" : codes,
+			"codes_test" : codes_test,
+			"model" : models[i],
+			"links" : links,
+			"train_dataset" : train_datasets[i],
+			"test_dataset" : test_datasets[i],
+			"options" : options
+		}
+		args.append(dic)
+	return args
+
 # =====================================================================

@@ -41,7 +41,6 @@ def learnCollabSystem(train_datasets, test_datasets, options) :
 	# LEARNING OF THE LINKS
 	args = get_args_to_map_links(codes, codes_test, options)
 	links_tmp = p.map(learn_LinkNet, args)
-	sys.exit()
 
 	links = list()
 	for i in range(NVIEWS):
@@ -51,39 +50,7 @@ def learnCollabSystem(train_datasets, test_datasets, options) :
 
 	print("\n")
 
-	# TESTING THE RECONSTRUCTION
-	# PROTO WEIGTHING WITH GRAD
-	w = torch.FloatTensor(NVIEWS,NVIEWS).zero_()+1/(NVIEWS-1)
-	weights = (Variable(w, requires_grad=True))
-	criterion = nn.MSELoss()
+	args = get_args_to_map_weights(train_datasets, test_datasets, models, links, codes, codes_test,options)
+	weights = p.map(learn_weights_code, args)
 
-	for i in range(NVIEWS):
-		print("Reconstruction view " + str(i))
-		optimizer = optim.SGD([weights], lr=LEARNING_RATE_WEIGHTS)
-		scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
-		
-		for epoch in range(NSTEPS_WEIGHTS):
-			optimizer.zero_grad()
-
-			code_moyen = getWeightedInputCodes(i, models, links, train_datasets, weights)
-			indiv_reconstruit = models[i].decode(code_moyen)
-			
-			loss = criterion(indiv_reconstruit, train_datasets[i])
-			loss.backward()
-			optimizer.step()
-			scheduler.step(loss.data[0])
-
-			if epoch % VERBOSE_STEP == 0 and VERBOSE:
-				code_test_moyen = getWeightedInputCodes(i, models, links, test_datasets, weights)
-				indiv_reconstruit = models[i].decode(code_test_moyen)
-				loss = criterion(indiv_reconstruit, test_datasets[i])
-				print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
-
-		code_test_moyen = getWeightedInputCodes(i, models, links, test_datasets, weights)
-		indiv_reconstruit = models[i].decode(code_test_moyen)
-		loss = criterion(indiv_reconstruit, test_datasets[i])
-		print("\ttest loss : " + str(loss.data[0]))
-		print("\n")
-
-	print("Weights")
-	print(weights[:,:])
+	print("Done")
