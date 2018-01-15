@@ -1,4 +1,5 @@
 import sys
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -36,6 +37,7 @@ class AENet(nn.Module):
 		for i in range(self.n_hidden_layers - 1) :
 			name = "fct" + str(i)
 			fct = getattr(self, name)
+			print("call " + name)
 			x = F.relu(fct(x))
 		name = "fct" + str(self.n_hidden_layers - 1)
 		fct = getattr(self, name)
@@ -237,14 +239,14 @@ def learn_AENet(args):
 			# Test information
 			outputs = net(dataset_test)
 			loss = criterion(outputs, dataset_test)
-			if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] : 
+			if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_net == 0: 
 				print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
 
 			# Stop when test error is increasing
 			if loss.data[0] > min_test :
 				test_fail += 1
 				if test_fail > options["PATIENCE"] :
-					if options["VERBOSE"] : print("Stop : test error increasing")
+					if options["VERBOSE"] and id_net == 0: print("Stop : test error increasing")
 					net = deepcopy(min_model)
 					break
 			else :
@@ -312,14 +314,14 @@ def learn_LinkNet(args):
 			# Test information
 			outputs = net(data_test_in)
 			loss = criterion(outputs, data_test_out)
-			if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"]: 
+			if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and i == 0 and j == 1: 
 				print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
 
 			# Stop if test error is increasing
 			if loss.data[0] > min_test :
 				test_fail += 1
 				if test_fail > options["PATIENCE"] :
-					if options["VERBOSE"] : print("Stop : test error increasing")
+					if options["VERBOSE"] and i == 0 : print("Stop : test error increasing")
 					net = deepcopy(min_model)
 					break
 			else :
@@ -405,7 +407,7 @@ def learn_weights_code(args):
 		optimizer.step()
 		scheduler.step(loss.data[0])
 
-		if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"]:
+		if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_view == 0:
 			code_test_moyen = getWeightedInputCodes(id_view, codes_test, links, weights)
 			indiv_reconstruit = model.decode(code_test_moyen)
 			loss = criterion(indiv_reconstruit, test_dataset)
@@ -439,3 +441,196 @@ def get_args_to_map_weights(train_datasets, test_datasets, models, links, codes,
 	return args
 
 # =====================================================================
+
+def get_args_to_map_links2(codes, codes_test, train_datasets, test_datasets, options):
+	NVIEWS = len(codes)
+	args = list()
+	for i in range(NVIEWS):
+		for j in range(NVIEWS):
+			dic = {
+				"id_in" : i,
+				"id_out" : j,
+				"data_in" : codes[i],
+				"data_out" : train_datasets[j],
+				"test_in" : codes_test[i],
+				"test_out" : test_datasets[j],
+				"options" : options	
+			}
+			args.append(dic)
+	return args
+
+# =====================================================================
+
+def learn_weights_code2(args):
+	id_view = args["id_view"]
+
+	codes = args["codes"]
+	codes_test = args["codes_test"]
+
+	model = args["model"]
+	links = args["links"]
+
+	train_dataset = args["train_dataset"]
+	test_dataset = args["test_dataset"]
+
+	options = args["options"]
+
+	NVIEWS = len(codes)
+
+	# TESTING THE RECONSTRUCTION
+	# PROTO WEIGTHING WITH GRAD
+	w = torch.FloatTensor(NVIEWS).zero_()+1/(NVIEWS-1)
+	weights = (Variable(w, requires_grad=True))
+	criterion = nn.MSELoss()
+
+	print("Reconstruction view " + str(id_view) + " : learning...")
+	optimizer = optim.SGD([weights], lr=options["LEARNING_RATE_WEIGHTS"])
+	scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+	
+	for epoch in range(options["NSTEPS_WEIGHTS"]):
+		optimizer.zero_grad()
+
+		mean_reconstr = getWeightedOutput(id_view, codes, links, weights)
+		
+		loss = criterion(mean_reconstr, train_dataset)
+		loss.backward()
+		optimizer.step()
+		scheduler.step(loss.data[0])
+
+		if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_view == 0:
+			mean_reconstr_test = getWeightedOutput(id_view, codes_test, links, weights)
+			loss = criterion(mean_reconstr_test, test_dataset)
+			print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
+
+	mean_reconstr_test = getWeightedOutput(id_view, codes_test, links, weights)
+	loss = criterion(mean_reconstr_test, test_dataset)
+	print("\tReconstruction view " + str(id_view) + " - test loss : " + str(loss.data[0]))
+	print("\tWeights view " + str(id_view))
+	print(weights[:])
+	return(weights)
+
+# =====================================================================
+
+def getWeightedOutput(i, codes, links, weights):
+	w_partial_reconstr = list()
+	for j in range(len(codes)):
+		if i != j :
+			code_externe = codes[j]
+			partial_reconstr = links[j][i](code_externe)*weights[j]
+			w_partial_reconstr.append(partial_reconstr)
+
+	mean_reconstr = ft.reduce(lambda x, y: x+y, w_partial_reconstr)
+
+	return mean_reconstr
+
+# =====================================================================
+
+def get_args_to_map_links3(codes, codes_test, train_datasets, test_datasets, options):
+	NVIEWS = len(codes)
+	args = list()
+	for i in range(NVIEWS):
+		for j in range(NVIEWS):
+			dic = {
+				"id_in" : i,
+				"id_out" : j,
+				"data_in" : train_datasets[i],
+				"data_out" : codes[j],
+				"test_in" : test_datasets[i],
+				"test_out" : codes_test[j],
+				"options" : options	
+			}
+			args.append(dic)
+	return args
+
+# =====================================================================
+
+def get_args_to_map_weights3(train_datasets, test_datasets, models, links, options):
+	NVIEWS = len(train_datasets)
+	args = list()
+	for i in range(NVIEWS):
+		dic = {
+			"id_view" : i,
+			"model" : models[i],
+			"links" : links,
+			"train_datasets" : train_datasets,
+			"test_datasets" : test_datasets,
+			"options" : options
+		}
+		args.append(dic)
+	return args
+
+# =====================================================================
+
+def learn_weights_code3(args):
+	id_view = args["id_view"]
+
+	model = args["model"]
+	links = args["links"]
+
+	train_datasets = args["train_datasets"]
+	test_datasets = args["test_datasets"]
+
+	options = args["options"]
+
+	NVIEWS = len(train_datasets)
+
+	# TESTING THE RECONSTRUCTION
+	# PROTO WEIGTHING WITH GRAD
+	w = torch.FloatTensor(NVIEWS).zero_()+1/(NVIEWS-1)
+	weights = (Variable(w, requires_grad=True))
+	criterion = nn.MSELoss()
+
+	print("Reconstruction view " + str(id_view) + " : learning...")
+	optimizer = optim.SGD([weights], lr=options["LEARNING_RATE_WEIGHTS"])
+	scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+	
+	for epoch in range(options["NSTEPS_WEIGHTS"]):
+		optimizer.zero_grad()
+
+		code_moyen = getWeightedInputCodes3(id_view, train_datasets, links, weights)
+		indiv_reconstruit = model.decode(code_moyen)
+		
+		loss = criterion(indiv_reconstruit, train_datasets[id_view])
+		loss.backward()
+		optimizer.step()
+		scheduler.step(loss.data[0])
+
+		if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_view == 0:
+			code_test_moyen = getWeightedInputCodes3(id_view, test_datasets, links, weights)
+			indiv_reconstruit = model.decode(code_test_moyen)
+			loss = criterion(indiv_reconstruit, test_datasets[id_view])
+			print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
+
+	code_test_moyen = getWeightedInputCodes3(id_view, test_datasets, links, weights)
+	indiv_reconstruit = model.decode(code_test_moyen)
+	loss = criterion(indiv_reconstruit, test_datasets[id_view])
+	print((indiv_reconstruit - test_datasets[id_view])[0:20,:])
+	print("\tReconstruction view " + str(id_view) + " - test loss : " + str(loss.data[0]))
+	print("\tWeights view " + str(id_view))
+	print(weights[:])
+	return(weights)
+
+# =====================================================================
+
+def getWeightedInputCodes3(i, datasets, links, weights):
+	w_codes = list()
+	for j in range(len(datasets)):
+		if i != j :
+			data_externe = datasets[j]
+			code_interne = links[j][i](data_externe)*weights[j]
+			w_codes.append(code_interne)
+
+	code_moyen = ft.reduce(lambda x, y: x+y, w_codes)
+
+	return code_moyen
+
+# =====================================================================
+
+def labels_as_matrix(labels):
+	n = pd.get_dummies(labels).values
+	n = n.astype("float")
+	print(n.dtype)
+	print(torch.from_numpy(n))
+	labels = set(labels)
+	print(labels)
+	return(labels)

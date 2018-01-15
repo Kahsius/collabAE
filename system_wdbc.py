@@ -1,6 +1,7 @@
 from collabAE import *
 import pandas as pd
 import numpy as np
+import sys
 
 VERBOSE = False
 VERBOSE_STEP = 100
@@ -11,14 +12,18 @@ NSTEPS = 5000
 NSTEPS_WEIGHTS = 1000
 NVIEWS = 3
 LAYERS_AE = [10]
-LAYERS_LINKS = [20]
+LAYERS_LINKS = [10]
 LEARNING_RATE_AE = 0.03
-LEARNING_RATE_LINKS = 0.06
+LEARNING_RATE_LINKS = 0.05
 LEARNING_RATE_WEIGHTS = 0.01
 MOMENTUM = 0.9
-PATIENCE = 100
+PATIENCE = 200
+version = 3
 
 data = pd.read_csv("data/wdbc.data", header=None).values[:,2:]
+labels = pd.read_csv("data/wdbc.data", header=None).values[:,1]
+labels = labels_as_matrix(labels)
+sys.exit()
 data = np.array(data, dtype='float')
 data = scale(data)
 np.random.shuffle(data)
@@ -39,8 +44,8 @@ test_datasets = getViewsFromIndexes(test_data, indexes)
 print("\n")
 print("nData : " + str(nData))
 print("Test : " + str(nTest))
-print("dim AE : " + str(["input"] + LAYERS_AE))
-print("dim Links : " + str([LAYERS_AE[-1]] + LAYERS_LINKS + [LAYERS_AE[-1]]))
+print("dim AE : input "+ str(LAYERS_AE))
+print("dim Links : input " + str(LAYERS_LINKS + [LAYERS_AE[-1]]))
 print("Indexes : " + str(indexes))
 print("\n")
 
@@ -58,4 +63,11 @@ options = {
 	"PATIENCE" : PATIENCE
 }
 
-learnCollabSystem(train_datasets, test_datasets, options)
+if version == 1 :
+	learnCollabSystem(train_datasets, test_datasets, options)
+elif version == 2 :
+	learnCollabSystem2(train_datasets, test_datasets, options)
+elif version == 3 :
+	learnCollabSystem3(train_datasets, test_datasets, options)
+else :
+	print("Wrong version number : " + str(version))

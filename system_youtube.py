@@ -34,5 +34,6 @@ for filename in filenames :
 		dataset = Variable(dataset.to_dense())
 		train_datasets.append(dataset[nTest:,:])
 		test_datasets.append(dataset[:nTest,:])
+		if len(train_datasets) == 3 : break
 
 learnCollabSystem(train_datasets, test_datasets, options)
