@@ -1,6 +1,4 @@
 from collabAE import *
-import sys
-import pickle
 import os
 
 path = "data/dir_data/test/"
@@ -33,9 +31,8 @@ for filename in filenames :
 	if dataset.size()[0] == 11930 :
 		print("Using " + filename)
 		names.append(short_name)
-		dataset = dataset.to_dense()
+		dataset = Variable(dataset.to_dense())
 		train_datasets.append(dataset[nTest:,:])
 		test_datasets.append(dataset[:nTest,:])
-
 
 learnCollabSystem(train_datasets, test_datasets, options)

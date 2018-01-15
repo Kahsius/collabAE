@@ -93,14 +93,14 @@ def getViewsFromIndexes(data, indexes):
 # =====================================================================
 
 def getWeightedInputCodes(i, codes, links, weights):
-	codes = list()
+	w_codes = list()
 	for j in range(len(codes)):
 		if i != j :
 			code_externe = codes[j]
 			code_interne = links[j][i](code_externe)*weights[j]
-			codes.append(code_interne)
+			w_codes.append(code_interne)
 
-	code_moyen = ft.reduce(lambda x, y: x+y, codes)
+	code_moyen = ft.reduce(lambda x, y: x+y, w_codes)
 
 	return code_moyen
 
@@ -295,7 +295,7 @@ def learn_LinkNet(args):
 		dimData_out = data_out.size()[1]
 
 		# DEFINE THE MODEL
-		print("Link " + str(i) + " ~ " + str(j))
+		print("Link " + str(i) + " ~ " + str(j) + " : learning...")
 		net = LinkNet( [dimData_in] + options["LAYERS_LINKS"] + [dimData_out] )
 		criterion = nn.MSELoss()
 		optimizer = optim.SGD( net.parameters(), \
@@ -343,7 +343,7 @@ def learn_LinkNet(args):
 
 		outputs = net(data_test_in)
 		loss = criterion(outputs, data_test_out)
-		print("\ttest loss : " + str(loss.data[0]))
+		print("\tLink " + str(i) + " ~ " + str(j) + " - test loss : " + str(loss.data[0]))
 
 		return net
 
@@ -390,7 +390,7 @@ def learn_weights_code(args):
 	weights = (Variable(w, requires_grad=True))
 	criterion = nn.MSELoss()
 
-	print("Reconstruction view " + str(id_view))
+	print("Reconstruction view " + str(id_view) + " : learning...")
 	optimizer = optim.SGD([weights], lr=options["LEARNING_RATE_WEIGHTS"])
 	scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 	
@@ -398,7 +398,7 @@ def learn_weights_code(args):
 		optimizer.zero_grad()
 
 		code_moyen = getWeightedInputCodes(id_view, codes, links, weights)
-		indiv_reconstruit = models[id_view].decode(code_moyen)
+		indiv_reconstruit = model.decode(code_moyen)
 		
 		loss = criterion(indiv_reconstruit, train_dataset)
 		loss.backward()
@@ -407,18 +407,16 @@ def learn_weights_code(args):
 
 		if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"]:
 			code_test_moyen = getWeightedInputCodes(id_view, codes_test, links, weights)
-			indiv_reconstruit = models[id_view].decode(code_test_moyen)
+			indiv_reconstruit = model.decode(code_test_moyen)
 			loss = criterion(indiv_reconstruit, test_dataset)
 			print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
 
 	code_test_moyen = getWeightedInputCodes(id_view, codes_test, links, weights)
 	indiv_reconstruit = model.decode(code_test_moyen)
 	loss = criterion(indiv_reconstruit, test_dataset)
-	print("\ttest loss : " + str(loss.data[0]))
-	print("\n")
-
-	print("Weights view " + str(id_view))
-	print(weights[:,:])
+	print("\tReconstruction view " + str(id_view) + " - test loss : " + str(loss.data[0]))
+	print("\tWeights view " + str(id_view))
+	print(weights[:])
 	return(weights)
 
 # =====================================================================
