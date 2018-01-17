@@ -5,9 +5,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import functools as ft
 import torch.optim as optim
+from numpy import e, pi, asarray
 from sklearn.preprocessing import scale
 from copy import deepcopy
 from torch.autograd import Variable
+from operator import mul
 
 # ===================================================================== 
 
@@ -67,14 +69,51 @@ class LinkNet(nn.Module):
 			setattr(self, name, f)
 
 	def forward(self, x):
+		for i in range(self.n_hidden_layers+1):
+			name = "fct" + str(i)
+			fct = getattr(self, name)
+			x = F.relu(fct(x))
+		return x
+
+# ===================================================================== 
+
+class ClassifNet(nn.Module):
+	def __init__(self, arrDim):
+		super(ClassifNet, self).__init__()
+		self.n_hidden_layers = len(arrDim) - 2
+
+		for i in range( len(arrDim) - 1 ):
+			f = nn.Linear( arrDim[i], arrDim[i+1] )
+			name = "fct" + str(i)
+			setattr(self, name, f)
+
+	def forward(self, x):
 		for i in range(self.n_hidden_layers):
 			name = "fct" + str(i)
 			fct = getattr(self, name)
 			x = F.relu(fct(x))
 		name = "fct" + str(self.n_hidden_layers)
 		fct = getattr(self, name)
-		x = F.relu(fct(x))
+		x = fct(x)
 		return x
+
+	def getClasses(self, x):
+		r = self.forward(x)
+		_, predictions = torch.max(r, 1)
+		return predictions
+
+# ===================================================================== 
+
+class CollabSystem():
+	def __init__(self, autoencoders, links, weights):
+		self.ae = autoencoders
+		self.links = links
+		self.w = weights
+
+	def forward(self, id_view, datasets):
+		code_moyen = getWeightedInputCodes3(id_view, datasets, self.links, self.w[id_view])
+		indiv_reconstruit = self.ae[id_view].decode(code_moyen)
+		return indiv_reconstruit
 
 # =====================================================================
 
@@ -222,8 +261,6 @@ def learn_AENet(args):
 
 		dimData = dataset.size()[1]
 
-		print("View " + str(id_net) + " : learning...")
-
 		# MODEL DEFINITION
 		net = AENet( [dimData] + options["LAYERS_AE"] )
 		criterion = nn.MSELoss()
@@ -267,8 +304,7 @@ def learn_AENet(args):
 
 		outputs = net(dataset_test)
 		loss = criterion(outputs, dataset_test)
-		print("View " + str(id_net) + " : done")
-		print("\ttest loss : " + str(loss.data[0]))
+		print("\tView " + str(id_net) + " - test loss (MSE) : " + str(loss.data[0]))
 
 		return net
 
@@ -297,7 +333,6 @@ def learn_LinkNet(args):
 		dimData_out = data_out.size()[1]
 
 		# DEFINE THE MODEL
-		print("Link " + str(i) + " ~ " + str(j) + " : learning...")
 		net = LinkNet( [dimData_in] + options["LAYERS_LINKS"] + [dimData_out] )
 		criterion = nn.MSELoss()
 		optimizer = optim.SGD( net.parameters(), \
@@ -340,12 +375,9 @@ def learn_LinkNet(args):
 			optimizer.step()
 			scheduler.step(loss.data[0])
 
-		# print(net(data_test_in).data[1:10,:])
-		# print(data_test_in.data[1:10,:])
-
 		outputs = net(data_test_in)
 		loss = criterion(outputs, data_test_out)
-		print("\tLink " + str(i) + " ~ " + str(j) + " - test loss : " + str(loss.data[0]))
+		print("\tLink " + str(i) + " ~ " + str(j) + " - test loss (MSE) : " + str(loss.data[0]))
 
 		return net
 
@@ -537,7 +569,7 @@ def get_args_to_map_links3(codes, codes_test, train_datasets, test_datasets, opt
 				"data_out" : codes[j],
 				"test_in" : test_datasets[i],
 				"test_out" : codes_test[j],
-				"options" : options	
+				"options" : options,
 			}
 			args.append(dic)
 	return args
@@ -580,9 +612,8 @@ def learn_weights_code3(args):
 	weights = (Variable(w, requires_grad=True))
 	criterion = nn.MSELoss()
 
-	print("Reconstruction view " + str(id_view) + " : learning...")
 	optimizer = optim.SGD([weights], lr=options["LEARNING_RATE_WEIGHTS"])
-	scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+	scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30)
 	
 	for epoch in range(options["NSTEPS_WEIGHTS"]):
 		optimizer.zero_grad()
@@ -604,10 +635,10 @@ def learn_weights_code3(args):
 	code_test_moyen = getWeightedInputCodes3(id_view, test_datasets, links, weights)
 	indiv_reconstruit = model.decode(code_test_moyen)
 	loss = criterion(indiv_reconstruit, test_datasets[id_view])
-	print((indiv_reconstruit - test_datasets[id_view])[0:20,:])
-	print("\tReconstruction view " + str(id_view) + " - test loss : " + str(loss.data[0]))
-	print("\tWeights view " + str(id_view))
-	print(weights[:])
+	# print((indiv_reconstruit - test_datasets[id_view])[0:20,:])
+	print("\Reconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
+	# print("\tWeights view " + str(id_view))
+	# print(weights[:])
 	return(weights)
 
 # =====================================================================
@@ -627,10 +658,104 @@ def getWeightedInputCodes3(i, datasets, links, weights):
 # =====================================================================
 
 def labels_as_matrix(labels):
-	n = pd.get_dummies(labels).values
-	n = n.astype("float")
-	print(n.dtype)
-	print(torch.from_numpy(n))
+	n_categories = pd.get_dummies(labels).values.shape[1]
+	n = pd.Series(labels, dtype="category")
+	n = n.cat.rename_categories(range(n_categories))
+	n = asarray(n)
 	labels = set(labels)
-	print(labels)
-	return(labels)
+	return((n, labels))
+
+# =====================================================================
+
+def new_loss(values, target, epsilon=0.01 ):
+	mu = torch.clamp(torch.abs(target), min = epsilon)
+	r = e ** (-(target-values)**2/(2*mu**2))
+	r /= (2*pi*mu)**(1/2)
+	r = r.sum()/ft.reduce(mul, r.shape)
+	return -r
+
+# =====================================================================
+
+def get_args_to_map_classifiers(train_datasets, test_datasets, train_labels, test_labels, options):
+	NVIEWS = len(train_datasets)
+	args = list()
+	for i in range(NVIEWS):
+		dic = {
+			"id_in" : i,
+			"data_in" : train_datasets[i],
+			"data_out" : train_labels,
+			"test_in" : test_datasets[i],
+			"test_out" : test_labels,
+			"options" : options,
+		}
+		args.append(dic)
+	return args
+
+# =====================================================================
+
+def learn_ClassifierNet(args):
+	i = args["id_in"]
+	options = args["options"]
+
+	data_in = args["data_in"]
+	data_out = args["data_out"]
+	data_test_in = args["test_in"]
+	data_test_out = args["test_out"]
+
+	dimData_in = data_in.size()[1]
+	dimData_out = len(data_out)
+
+	# DEFINE THE MODEL
+	net = ClassifNet( [dimData_in] + options["LAYERS_CLASSIF"] + [dimData_out] )
+	criterion = nn.CrossEntropyLoss()
+	optimizer = optim.SGD( net.parameters(), \
+		lr=options["LEARNING_RATE_CLASSIF"], \
+		momentum=options["MOMENTUM"])
+	scheduler = optim.lr_scheduler.StepLR(optimizer, step_size = 30)
+
+	# LEARNING
+	test_fail = 0
+	min_test = float("inf")
+	min_model = object()
+	for epoch in range(options["NSTEPS"]):
+
+		# Test information
+		outputs = net(data_test_in)
+		loss = criterion(outputs, data_test_out)
+		if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and i == 0 : 
+			print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
+
+		# Stop if test error is increasing
+		if loss.data[0] > min_test :
+			test_fail += 1
+			if test_fail > options["PATIENCE"] :
+				if options["VERBOSE"] and i == 0 : print("Stop : test error increasing")
+				net = deepcopy(min_model)
+				break
+		else :
+			min_test = loss.data[0]
+			test_fail = 0
+			min_model = deepcopy(net)
+
+		optimizer.zero_grad()
+		
+		# Train information
+		outputs = net(data_in)
+		loss = criterion(outputs, data_out)
+
+		# Parameters optimization
+		loss.backward()
+		optimizer.step()
+		scheduler.step(loss.data[0])
+
+	# outputs = net(data_test_in)
+	# loss = criterion(outputs, data_test_out)
+	# print("\tClassifier " + str(i) + " - test loss : " + str(loss.data[0]))
+
+	predictions = net.getClasses(data_test_in)
+	accuracy = torch.sum(torch.eq(predictions, data_test_out)).float()/len(data_test_out)
+	accuracy = str(accuracy.data[0])
+
+	print("\tClassifier " + str(i) + " - accuracy : " + accuracy)
+
+	return net
