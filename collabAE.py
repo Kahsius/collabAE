@@ -106,12 +106,14 @@ def learnCollabSystem3(train_datasets, test_datasets, options) :
 		print("\tTest a priori : " + str(test_apriori))
 
 		args = get_args_to_map_classifiers(train_datasets, test_datasets, train_labels, test_labels, options)
-		classifiers = p.map(learn_ClassifierNet, args)
+		# classifiers = p.map(learn_ClassifierNet, args)
+		classifiers = list(learn_ClassifierNet(arg) for arg in args)
 
 	# LEARNING ALL THE MODELS AND GET THE CODES
 	print("Learning autoencoders...")
 	args = get_args_to_map_AE(train_datasets, test_datasets, options)
-	models = p.map(learn_AENet, args)
+	# models = p.map(learn_AENet, args)
+	models = list(learn_AENet(arg) for arg in args)
 
 	codes = list()
 	codes_test = list()
@@ -128,7 +130,8 @@ def learnCollabSystem3(train_datasets, test_datasets, options) :
 	# LEARNING OF THE LINKS
 	print("Learnings links...")
 	args = get_args_to_map_links3(codes, codes_test, train_datasets, test_datasets, options)
-	links_tmp = p.map(learn_LinkNet, args)
+	# links_tmp = p.map(learn_LinkNet, args)
+	links_tmp = list(learn_LinkNet(arg) for arg in args)
 
 	links = list()
 	for i in range(NVIEWS):
@@ -136,9 +139,10 @@ def learnCollabSystem3(train_datasets, test_datasets, options) :
 		for j in range(NVIEWS):
 			links[i].append(links_tmp[i*NVIEWS+j])
 
-	print("Learning weights...")
+	print("Learning weights and final reconstruction...")
 	args = get_args_to_map_weights3(train_datasets, test_datasets, models, links, options)
-	weights = p.map(learn_weights_code3, args)
+	# weights = p.map(learn_weights_code3, args)
+	weights = list(learn_weights_code3(arg) for arg in args)
 
 	cs = CollabSystem(models, links, weights)
 

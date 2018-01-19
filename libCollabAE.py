@@ -39,7 +39,6 @@ class AENet(nn.Module):
 		for i in range(self.n_hidden_layers - 1) :
 			name = "fct" + str(i)
 			fct = getattr(self, name)
-			print("call " + name)
 			x = F.relu(fct(x))
 		name = "fct" + str(self.n_hidden_layers - 1)
 		fct = getattr(self, name)
@@ -220,7 +219,7 @@ def read_sparse_to_pytorch(data_file_name):
 			if len(line) == 1: 
 				continue
 			label, features = line
-			labels += [label]
+			labels += [int(label)]
 			features = features.split(" ")
 			indexes_tmp = torch.LongTensor(2,len(features)).zero_()
 			values_tmp = torch.FloatTensor(len(features)).zero_()
@@ -229,7 +228,7 @@ def read_sparse_to_pytorch(data_file_name):
 				dimData = max(dimData, int(ind))
 				indexes_tmp[0,index_feature] = i-1
 				indexes_tmp[1,index_feature] = int(ind)
-				values_tmp[index_feature] = float(val)
+				values_tmp[index_feature] = float(val.strip("\n"))
 			list_indexes.append(indexes_tmp)
 			list_values.append(values_tmp)
 
@@ -636,7 +635,7 @@ def learn_weights_code3(args):
 	indiv_reconstruit = model.decode(code_test_moyen)
 	loss = criterion(indiv_reconstruit, test_datasets[id_view])
 	# print((indiv_reconstruit - test_datasets[id_view])[0:20,:])
-	print("\Reconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
+	print("\tReconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
 	# print("\tWeights view " + str(id_view))
 	# print(weights[:])
 	return(weights)
@@ -686,7 +685,7 @@ def get_args_to_map_classifiers(train_datasets, test_datasets, train_labels, tes
 			"data_out" : train_labels,
 			"test_in" : test_datasets[i],
 			"test_out" : test_labels,
-			"options" : options,
+			"options" : options
 		}
 		args.append(dic)
 	return args
@@ -703,10 +702,10 @@ def learn_ClassifierNet(args):
 	data_test_out = args["test_out"]
 
 	dimData_in = data_in.size()[1]
-	dimData_out = len(data_out)
+	dimData_out = torch.max(data_out) + 1
 
 	# DEFINE THE MODEL
-	net = ClassifNet( [dimData_in] + options["LAYERS_CLASSIF"] + [dimData_out] )
+	net = ClassifNet( [dimData_in] + options["LAYERS_CLASSIF"] + [dimData_out.data[0]] )
 	criterion = nn.CrossEntropyLoss()
 	optimizer = optim.SGD( net.parameters(), \
 		lr=options["LEARNING_RATE_CLASSIF"], \
