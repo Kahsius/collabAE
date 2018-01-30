@@ -758,3 +758,22 @@ def learn_ClassifierNet(args):
 	print("\tClassifier " + str(i) + " - accuracy : " + accuracy)
 
 	return net
+
+
+# =====================================================================
+
+def get_dim_sparse_file(filename) :
+	dimData = 0
+	for line in open(filename) :
+		if line[0] != "#" and len(line) > 1 :
+			line = line.split(" ", 1)
+		# In case an instance with all zero features
+			if len(line) == 1: 
+				continue
+			label, features = line
+			features = features.split(" ")
+			for index_feature, e in enumerate(features):
+				ind, val = e.split(":")
+				dimData = max(dimData, int(ind))
+	print("dimData : " + str(dimData))
+	return dimData
