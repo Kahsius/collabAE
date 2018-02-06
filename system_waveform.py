@@ -15,26 +15,23 @@ PTEST = .1
 NSTEPS = 5000
 NSTEPS_WEIGHTS = 1000
 
-LAYERS_AE = [10]
-LAYERS_LINKS = [10]
-LAYERS_CLASSIF = [10]
+LAYERS_AE = [15]
+LAYERS_LINKS = [15]
+LAYERS_CLASSIF = [20]
 
 LEARNING_RATE_AE = 0.03
 LEARNING_RATE_LINKS = 0.05
 LEARNING_RATE_CLASSIF = 0.025
 LEARNING_RATE_WEIGHTS = 0.01
 
-LEARN_WEIGHTS = True
-
 MOMENTUM = 0.9
 PATIENCE = 200
-version = 3
 
-data = pd.read_csv("data/wdbc/wdbc.data", header=None).values[:,2:]
+data = pd.read_csv("data/waveform/waveform-+noise.data", header=None).values[:,:-2]
 data = np.array(data, dtype='float')
 data = scale(data)
 
-labels = pd.read_csv("data/wdbc/wdbc.data", header=None).values[:,1]
+labels = pd.read_csv("data/waveform/waveform-+noise.data", header=None).values[:,-1]
 labels, names_labels = labels_as_matrix(labels)
 
 np.random.seed(np.random.randint(10000))
@@ -69,22 +66,21 @@ print("Indexes : " + str(indexes))
 print("\n")
 
 options = {
-	"VERBOSE" : VERBOSE,
-	"VERBOSE_STEP" : VERBOSE_STEP,
-	"NSTEPS" : NSTEPS,
-	"NSTEPS_WEIGHTS" : NSTEPS_WEIGHTS,
-	"LAYERS_AE" : LAYERS_AE,
-	"LAYERS_LINKS" : LAYERS_LINKS,
-	"LAYERS_CLASSIF" : LAYERS_CLASSIF,
-	"LEARNING_RATE_AE" : LEARNING_RATE_AE,
-	"LEARNING_RATE_LINKS" : LEARNING_RATE_WEIGHTS,
-	"LEARNING_RATE_WEIGHTS" : LEARNING_RATE_WEIGHTS,
-	"LEARNING_RATE_CLASSIF" : LEARNING_RATE_CLASSIF,
-	"MOMENTUM" : MOMENTUM,
-	"PATIENCE" : PATIENCE,
-	"LEARN_WEIGHTS" : LEARN_WEIGHTS,
-	"train_labels" : train_labels,
-	"test_labels" : test_labels
+    "VERBOSE" : VERBOSE,
+    "VERBOSE_STEP" : VERBOSE_STEP,
+    "NSTEPS" : NSTEPS,
+    "NSTEPS_WEIGHTS" : NSTEPS_WEIGHTS,
+    "LAYERS_AE" : LAYERS_AE,
+    "LAYERS_LINKS" : LAYERS_LINKS,
+    "LAYERS_CLASSIF" : LAYERS_CLASSIF,
+    "LEARNING_RATE_AE" : LEARNING_RATE_AE,
+    "LEARNING_RATE_LINKS" : LEARNING_RATE_WEIGHTS,
+    "LEARNING_RATE_WEIGHTS" : LEARNING_RATE_WEIGHTS,
+    "LEARNING_RATE_CLASSIF" : LEARNING_RATE_CLASSIF,
+    "MOMENTUM" : MOMENTUM,
+    "PATIENCE" : PATIENCE,
+    "train_labels" : train_labels,
+    "test_labels" : test_labels
 }
 
 learnCollabSystem3(train_datasets, test_datasets, options)
