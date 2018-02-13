@@ -113,3 +113,18 @@ class CollabSystem():
         return indiv_reconstruit
 
 # =====================================================================
+
+class CollabSystem4():
+    def __init__(self, autoencoders, links, weights):
+        self.ae = autoencoders
+        self.links = links
+        self.w = weights
+
+    def forward(self, id_view, datasets):
+        codes = list()
+        for i in range(len(datasets)):
+            codes.append(self.ae.encode(datasets[i]))
+        indiv_reconstruit = get_weighted_outputs(id_view, codes, self.links, self.w)
+        return indiv_reconstruit
+
+# =====================================================================

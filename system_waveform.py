@@ -79,6 +79,7 @@ options = {
     "LEARNING_RATE_CLASSIF" : LEARNING_RATE_CLASSIF,
     "MOMENTUM" : MOMENTUM,
     "PATIENCE" : PATIENCE,
+    "LEARN_WEIGHTS" : True,
     "train_labels" : train_labels,
     "test_labels" : test_labels
 }

@@ -199,6 +199,25 @@ def get_args_to_map_links3(codes, codes_test, train_datasets, test_datasets, opt
 
 # =====================================================================
 
+def get_args_to_map_links4(codes, codes_test, train_datasets, test_datasets, options):
+    NVIEWS = len(codes)
+    args = list()
+    for i in range(NVIEWS):
+        for j in range(NVIEWS):
+            dic = {
+                "id_in" : i,
+                "id_out" : j,
+                "data_in" : codes[i],
+                "data_out" : train_datasets[j],
+                "test_in" : codes_test[i],
+                "test_out" : test_datasets[j],
+                "options" : options,
+            }
+            args.append(dic)
+    return args
+
+# =====================================================================
+
 def get_args_to_map_weights3(train_datasets, test_datasets, models, links, options):
     NVIEWS = len(train_datasets)
     args = list()
@@ -216,6 +235,24 @@ def get_args_to_map_weights3(train_datasets, test_datasets, models, links, optio
 
 # =====================================================================
 
+def get_args_to_map_weights4(codes, codes_test, train_datasets, test_datasets, models, links, options):
+    NVIEWS = len(train_datasets)
+    args = list()
+    for i in range(NVIEWS):
+        dic = {
+            "id_view" : i,
+            "links" : links,
+            "codes" : codes,
+            "codes_test" : codes_test,
+            "train_dataset" : train_datasets[i],
+            "test_dataset" : test_datasets[i],
+            "options" : options
+        }
+        args.append(dic)
+    return args
+
+# =====================================================================
+
 def getWeightedInputCodes3(i, datasets, links, weights):
     w_codes = list()
     for j in range(len(datasets)):
@@ -226,6 +263,22 @@ def getWeightedInputCodes3(i, datasets, links, weights):
 
     code_moyen = ft.reduce(lambda x, y: x+y, w_codes)
     return code_moyen
+
+# =====================================================================
+
+def get_weighted_outputs(i, codes, links, weights):
+    w_output = list()
+    for j in range(len(codes)):
+        if i != j :
+            code_externe = codes[j]
+            data_interne = links[j][i](code_externe)
+            if i == 0 :
+                print(data_interne)
+            data_interne *= weights[j]
+            w_output.append(data_interne)
+
+    data_moyen = ft.reduce(lambda x, y: x+y, w_output)
+    return data_moyen
 
 # =====================================================================
 
@@ -273,3 +326,15 @@ def labels_as_matrix(labels):
     return((n, labels))
 
 # =====================================================================
+
+def crit_per_feature(data, target):
+    diff = torch.abs(data.data - target.data)
+    means = torch.mean(diff, dim = 0)
+    return means
+
+# =====================================================================
+
+def new_loss(data, target):
+    diff = (data - target)/target
+    relative = torch.mean(torch.abs(diff))
+    return relative

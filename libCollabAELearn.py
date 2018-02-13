@@ -19,7 +19,7 @@ def learn_AENet(args):
 
         # MODEL DEFINITION
         net = AENet( [dimData] + options["LAYERS_AE"] )
-        criterion = nn.MSELoss()
+        criterion = options["LOSS_METHOD"]
         optimizer = optim.SGD(net.parameters(), lr=options["LEARNING_RATE_AE"], momentum=options["MOMENTUM"])
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
@@ -84,7 +84,7 @@ def learn_LinkNet(args):
 
         # DEFINE THE MODEL
         net = LinkNet( [dimData_in] + options["LAYERS_LINKS"] + [dimData_out] )
-        criterion = nn.MSELoss()
+        criterion = options["LOSS_METHOD"]
         optimizer = optim.SGD( net.parameters(), \
             lr=options["LEARNING_RATE_LINKS"], \
             momentum=options["MOMENTUM"])
@@ -150,7 +150,7 @@ def learn_weights_code3(args):
     # PROTO WEIGTHING WITH GRAD
     w = torch.FloatTensor(NVIEWS).zero_()+1/(NVIEWS-1)
     weights = (Variable(w, requires_grad=True))
-    criterion = nn.MSELoss()
+    criterion = options["LOSS_METHOD"]
     if options["LEARN_WEIGHTS"] :
 
         optimizer = optim.SGD([weights], lr=options["LEARNING_RATE_WEIGHTS"])
@@ -176,9 +176,67 @@ def learn_weights_code3(args):
     code_test_moyen = getWeightedInputCodes3(id_view, test_datasets, links, weights)
     indiv_reconstruit = model.decode(code_test_moyen)
     loss = criterion(indiv_reconstruit, test_datasets[id_view])
+    loss2 = crit_per_feature(indiv_reconstruit, test_datasets[id_view])
+    mean_per_feat = torch.mean(torch.abs(test_datasets[id_view]), dim=0).data
+    delta = torch.abs((loss2 - mean_per_feat)/mean_per_feat)
 
     print("\tReconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
-    print("\tWeights view " + str(id_view) + " : " + str(weights[:].data.numpy()))
+    print("\t\tMean relative error per feature : " + str(delta))
+    print("\t\tWeights view : " + str(weights[:].data))
+    return(weights)
+
+# =====================================================================
+
+def learn_weights_code4(args):
+    id_view = args["id_view"]
+
+    links = args["links"]
+
+    codes = args["codes"]
+    codes_test = args["codes_test"]
+    train_dataset = args["train_dataset"]
+    test_dataset = args["test_dataset"]
+
+    options = args["options"]
+
+    NVIEWS = len(codes)
+
+    # TESTING THE RECONSTRUCTION
+    # PROTO WEIGTHING WITH GRAD
+    w = torch.FloatTensor(NVIEWS).zero_()+1/(NVIEWS-1)
+    weights = (Variable(w, requires_grad=True))
+    criterion = options["LOSS_METHOD"]
+    if options["LEARN_WEIGHTS"] :
+
+        optimizer = optim.SGD([weights], lr=options["LEARNING_RATE_WEIGHTS"])
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30)
+        
+        for epoch in range(options["NSTEPS_WEIGHTS"]):
+            optimizer.zero_grad()
+
+            indiv_reconstruit = get_weighted_outputs(id_view, codes, links, weights)
+            if id_view == 0 :
+                print(train_dataset)
+                break
+            loss = criterion(indiv_reconstruit, train_dataset)
+            loss.backward()
+            optimizer.step()
+            scheduler.step(loss.data[0])
+
+            if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_view == 0:
+                indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
+                loss = criterion(indiv_reconstruit, test_dataset)
+                print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
+
+    indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
+    loss = criterion(indiv_reconstruit, test_dataset)
+    loss2 = crit_per_feature(indiv_reconstruit, test_dataset)
+    mean_per_feat = torch.mean(torch.abs(test_dataset), dim=0).data
+    delta = torch.abs((loss2 - mean_per_feat)/mean_per_feat)
+
+    print("\tReconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
+    print("\t\tMean relative error per feature : " + str(delta.numpy()))
+    print("\t\tWeights view : " + str(weights[:].data.numpy()))
     return(weights)
 
 # =====================================================================
@@ -320,3 +378,69 @@ def learnCollabSystem3(train_datasets, test_datasets, options) :
         print("\tAccuracy view " + str(i) + " : " + str(output.data[0]))
 
 # =====================================================================
+
+def learnCollabSystem4(train_datasets, test_datasets, options) :
+
+    # PARAMETERS
+    NVIEWS = len(train_datasets)
+
+    if "train_labels" in options :
+        print("Learning classifiers...")
+        train_labels = options["train_labels"]
+        tmp = Counter(train_labels.data.numpy())
+        train_apriori = float(tmp.most_common(1)[0][1])/len(train_labels.data)
+
+        test_labels = options["test_labels"]
+        tmp = Counter(test_labels.data.numpy())
+        test_apriori = float(tmp.most_common(1)[0][1])/len(test_labels.data)
+        
+        print("\tTrain a priori : " + str(train_apriori))
+        print("\tTest a priori : " + str(test_apriori))
+
+        args = get_args_to_map_classifiers(train_datasets, test_datasets, train_labels, test_labels, options)
+        # classifiers = p.map(learn_ClassifierNet, args)
+        classifiers = list(learn_ClassifierNet(arg) for arg in args)
+
+    # LEARNING ALL THE MODELS AND GET THE CODES
+    print("Learning autoencoders...")
+    args = get_args_to_map_AE(train_datasets, test_datasets, options)
+    # models = p.map(learn_AENet, args)
+    models = list(learn_AENet(arg) for arg in args)
+
+    codes = list()
+    codes_test = list()
+    for i in range(NVIEWS):
+        # Codes gathering
+        code = models[i].encode(train_datasets[i])
+        code = Variable(code.data, requires_grad = False)
+        codes.append(code)
+
+        code_test = models[i].encode(test_datasets[i])
+        code_test = Variable(code_test.data, requires_grad = False)
+        codes_test.append(code_test)
+
+    # LEARNING OF THE LINKS
+    print("Learnings links...")
+    args = get_args_to_map_links4(train_datasets, test_datasets, codes, codes_test, options)
+    # links_tmp = p.map(learn_LinkNet, args)
+    links_tmp = list(learn_LinkNet(arg) for arg in args)
+
+    links = list()
+    for i in range(NVIEWS):
+        links.append(list())
+        for j in range(NVIEWS):
+            links[i].append(links_tmp[i*NVIEWS+j])
+
+    print("Learning weights and final reconstruction...")
+    args = get_args_to_map_weights4(codes, codes_test, train_datasets, test_datasets, models, links, options)
+    # weights = p.map(learn_weights_code3, args)
+    weights = list(learn_weights_code4(arg) for arg in args)
+
+    cs = CollabSystem4(models, links, weights)
+
+    print("Classification of the reconstruction")
+    for i in range(NVIEWS):
+        output = cs.forward(i, test_datasets)
+        output = classifiers[i].getClasses(output)
+        output = torch.sum(torch.eq(output, test_labels)).float()/len(test_labels)
+        print("\tAccuracy view " + str(i) + " : " + str(output.data[0]))
