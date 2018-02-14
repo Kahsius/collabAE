@@ -258,7 +258,7 @@ def getWeightedInputCodes3(i, datasets, links, weights):
     for j in range(len(datasets)):
         if i != j :
             data_externe = datasets[j]
-            code_interne = links[j][i](data_externe)*weights[j]
+            code_interne = links[j][i](data_externe)*weights[j,:]
             w_codes.append(code_interne)
 
     code_moyen = ft.reduce(lambda x, y: x+y, w_codes)
@@ -272,9 +272,7 @@ def get_weighted_outputs(i, codes, links, weights):
         if i != j :
             code_externe = codes[j]
             data_interne = links[j][i](code_externe)
-            if i == 0 :
-                print(data_interne)
-            data_interne *= weights[j]
+            data_interne *= weights[j,:]
             w_output.append(data_interne)
 
     data_moyen = ft.reduce(lambda x, y: x+y, w_output)

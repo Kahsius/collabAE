@@ -54,9 +54,10 @@ class AENet(nn.Module):
 # ===================================================================== 
 
 class LinkNet(nn.Module):
-    def __init__(self, arrDim):
+    def __init__(self, arrDim, clampOutput = True):
         super(LinkNet, self).__init__()
         self.n_hidden_layers = len(arrDim) - 2
+        self.clampOutput = clampOutput
 
         for i in range( len(arrDim) - 1 ):
             f = nn.Linear( arrDim[i], arrDim[i+1] )
@@ -67,12 +68,46 @@ class LinkNet(nn.Module):
         for i in range(self.n_hidden_layers+1):
             name = "fct" + str(i)
             fct = getattr(self, name)
-            x = F.relu(fct(x))
-            ones = Variable(torch.ones(x.shape))
-            x = torch.min(x, ones)
+            x = fct(x)
+            if self.clampOutput :
+                x = F.relu(x)
+                ones = Variable(torch.ones(x.shape))
+                x = torch.min(x, ones)
         return x
 
 # ===================================================================== 
+
+class GeminiLinkNet(nn.Module):
+    def __init__(self, arrDim, clampOutput = True):
+        super(GeminiLinkNet, self).__init__()
+        self.n_hidden_layers = len(arrDim) - 2
+        self.segmentsInput = arrDim[0]
+        self.clampOutput = clampOutput
+
+        for i in range( len(arrDim) - 1 ):
+            dimInput = arrDim[i] if i != 0 else sum(arrDim[i])
+            f = nn.Linear( dimInput, arrDim[i+1] )
+            name = "fct" + str(i)
+            setattr(self, name, f)
+
+    def forward(self, x1, x2=0):
+        if isinstance(x2, int) :
+            nData = x1.shape[0]
+            half_zeros = Variable(torch.zeros(nData, self.segmentsInput[1]))
+            x = torch.cat((x1, half_zeros), 1)
+        else :
+            x = torch.cat((x1, x2), 1)
+        for i in range(self.n_hidden_layers+1):
+            name = "fct" + str(i)
+            fct = getattr(self, name)
+            x = fct(x)
+            if self.clampOutput :
+                x = F.relu(x)
+                ones = Variable(torch.ones(x.shape))
+                x = torch.min(x, ones)
+        return x
+
+# =====================================================================
 
 class ClassifNet(nn.Module):
     def __init__(self, arrDim):
@@ -123,8 +158,8 @@ class CollabSystem4():
     def forward(self, id_view, datasets):
         codes = list()
         for i in range(len(datasets)):
-            codes.append(self.ae.encode(datasets[i]))
-        indiv_reconstruit = get_weighted_outputs(id_view, codes, self.links, self.w)
+            codes.append(self.ae[i].encode(datasets[i]))
+        indiv_reconstruit = get_weighted_outputs(id_view, codes, self.links, self.w[id_view])
         return indiv_reconstruit
 
 # =====================================================================

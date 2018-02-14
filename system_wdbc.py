@@ -12,26 +12,27 @@ VERBOSE_STEP = 100
 NVIEWS = 3
 PTEST = .1
 
-NSTEPS = 5000
-NSTEPS_WEIGHTS = 1000
+NSTEPS = 100000
+NSTEPS_WEIGHTS = 50000
 
-LOSS_METHOD = nn.L1Loss()
+LOSS_METHOD = nn.MSELoss()
 # LOSS_METHOD = new_loss
 
-LAYERS_AE = [10]
-LAYERS_LINKS = [10]
+LAYERS_AE = [15]
+LAYERS_LINKS = [15, 10]
 LAYERS_CLASSIF = [10]
 
 LEARNING_RATE_AE = 0.02
 LEARNING_RATE_LINKS = 0.05
-LEARNING_RATE_CLASSIF = 0.025
-LEARNING_RATE_WEIGHTS = 0.01
+LEARNING_RATE_CLASSIF = 0.03
+LEARNING_RATE_WEIGHTS = 0.05
 
 LEARN_WEIGHTS = True
 
 MOMENTUM = 0.9
 PATIENCE = 200
-version = 3
+version = 4
+clampOutput = False if version == 4 else True
 
 data = pd.read_csv("data/wdbc/wdbc.data", header=None).values[:,2:]
 data = np.array(data, dtype='float')
@@ -88,7 +89,13 @@ options = {
 	"LEARN_WEIGHTS" : LEARN_WEIGHTS,
 	"LOSS_METHOD" : LOSS_METHOD,
 	"train_labels" : train_labels,
-	"test_labels" : test_labels
+	"test_labels" : test_labels,
+	"clampOutput" : clampOutput,
+	"version" : version
 }
+if version == 3 :
+	learnCollabSystem3(train_datasets, test_datasets, options)
+elif version == 4 or version == 5:
+	learnCollabSystem4(train_datasets, test_datasets, options)
 
-learnCollabSystem3(train_datasets, test_datasets, options)
+	
