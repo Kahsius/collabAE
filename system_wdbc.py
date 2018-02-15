@@ -12,8 +12,8 @@ VERBOSE_STEP = 100
 NVIEWS = 3
 PTEST = .1
 
-NSTEPS = 100000
-NSTEPS_WEIGHTS = 50000
+NSTEPS = 50000
+NSTEPS_WEIGHTS = 10000
 
 LOSS_METHOD = nn.MSELoss()
 # LOSS_METHOD = new_loss
@@ -97,5 +97,3 @@ if version == 3 :
 	learnCollabSystem3(train_datasets, test_datasets, options)
 elif version == 4 or version == 5:
 	learnCollabSystem4(train_datasets, test_datasets, options)
-
-	

@@ -3,6 +3,7 @@ import torch
 import functools as ft
 from torch.autograd import Variable
 from numpy import asarray
+from sys import exit
 
 
 def getIndexesViews(dimData, nViews):
@@ -336,3 +337,12 @@ def new_loss(data, target):
     diff = (data - target)/target
     relative = torch.mean(torch.abs(diff))
     return relative
+
+# =====================================================================
+
+def normalize_weights(weights, id_view):
+    weights.requires_grad = False
+    for i in range(weights.shape[1]):
+        weights[:,i] = weights[:,i] / (sum(weights[:,i])-weights[id_view,i])
+    weights = Variable(weights.data, requires_grad = True)
+    return weights

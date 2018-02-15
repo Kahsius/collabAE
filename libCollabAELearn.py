@@ -334,6 +334,7 @@ def learn_weights_code4(args):
                 loss = criterion(indiv_reconstruit, test_dataset)
                 print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
 
+    # weights = normalize_weights(weights, id_view)
     indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
     loss = criterion(indiv_reconstruit, test_dataset)
     # loss2 = crit_per_feature(indiv_reconstruit, test_dataset)
@@ -509,6 +510,7 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
         args = get_args_to_map_classifiers(train_datasets, test_datasets, train_labels, test_labels, options)
         # classifiers = p.map(learn_ClassifierNet, args)
         classifiers = list(learn_ClassifierNet(arg) for arg in args)
+        test = classifiers[0].forward(train_datasets[0])
 
     # LEARNING ALL THE MODELS AND GET THE CODES
     print("Learning autoencoders...")
