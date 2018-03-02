@@ -346,3 +346,13 @@ def normalize_weights(weights, id_view):
         weights[:,i] = weights[:,i] / (sum(weights[:,i])-weights[id_view,i])
     weights = Variable(weights.data, requires_grad = True)
     return weights
+
+# =====================================================================
+
+def extract_results(l):
+    objects = []
+    results = []
+    for t in l :
+        objects.append(t[0])
+        results.append(t[1])
+    return objects, results

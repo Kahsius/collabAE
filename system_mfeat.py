@@ -2,30 +2,33 @@ from libCollabAELearn import *
 
 import pandas as pd
 import numpy as np
-import sys
-from sklearn.preprocessing import scale
-from sys import exit
+import pickle
+import time
 
-VERBOSE = True
+from sklearn.preprocessing import scale
+
+VERBOSE = False
 VERBOSE_STEP = 100
+BIG_TEST = True
+BIG_TEST_ITER = 20
 
 # HYPERPARAMETERS
-PTEST = .1
-
 NSTEPS = 5000
-NSTEPS_WEIGHTS = 1000
+NSTEPS_WEIGHTS = 2000
 
-LAYERS_AE = [150, 50, 20]
-LAYERS_LINKS = [50, 100]
+LAYERS_AE = [150, 20]
+LAYERS_LINKS = [150]
 LAYERS_CLASSIF = [150]
 
-LEARNING_RATE_AE = 0.03
+LEARNING_RATE_AE = 0.04
 LEARNING_RATE_LINKS = 0.05
 LEARNING_RATE_CLASSIF = 0.05
 LEARNING_RATE_WEIGHTS = 0.01
 
 MOMENTUM = 0.9
 PATIENCE = 200
+
+LEARN_WEIGHTS = False
 
 version = 4
 clampOutput = False if version == 4 else True
@@ -81,7 +84,7 @@ options = {
     "LEARNING_RATE_CLASSIF" : LEARNING_RATE_CLASSIF,
     "MOMENTUM" : MOMENTUM,
     "PATIENCE" : PATIENCE,
-    "LEARN_WEIGHTS" : True,
+    "LEARN_WEIGHTS" : LEARN_WEIGHTS,
     "LOSS_METHOD" : LOSS_METHOD,
     "train_labels" : train_labels,
     "test_labels" : test_labels,
@@ -92,6 +95,15 @@ options = {
 if version == 3 :
     learnCollabSystem3(train_datasets, test_datasets, options)
 elif version == 4 or version == 5:
-    learnCollabSystem4(train_datasets, test_datasets, options)
-
-    
+    if BIG_TEST :
+        for i in range(BIG_TEST_ITER) :
+            print("Test " + str(i))
+            print("Begin time : " + str(time.localtime()))
+            results = learnCollabSystem4(train_datasets, test_datasets, options)
+            f = "data/mfeat/results_sans_weights/results_" + str(i)
+            f = open(f, "w+b")
+            pickle.dump(results, f)
+            f.close()
+            print("End time : " + str(time.localtime()))
+    else :
+        learnCollabSystem4(train_datasets, test_datasets, options)

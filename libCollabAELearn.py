@@ -1,9 +1,13 @@
+import sys
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from collections import Counter
+import sklearn.cluster as cluster
+
 from copy import deepcopy
+from collections import Counter
 from torch.autograd import Variable
+from sklearn.metrics import confusion_matrix
 
 from libCollabAEClasses import *
 from libCollabAEUtils import *
@@ -62,7 +66,7 @@ def learn_AENet(args):
         loss = criterion(outputs, dataset_test)
         print("\tView " + str(id_net) + " - test loss (MSE) : " + str(loss.data[0]))
 
-        return net
+        return net, loss.data[0]
 
 # =====================================================================
 
@@ -72,7 +76,7 @@ def learn_LinkNet(args):
     options = args["options"]
 
     if i == j :
-        return []
+        return [], 0
     else :
         data_in = args["data_in"]
         data_out = args["data_out"]
@@ -129,7 +133,7 @@ def learn_LinkNet(args):
         loss = criterion(outputs, data_test_out)
         print("\tLink " + str(i) + " ~ " + str(j) + " - test loss (MSE) : " + str(loss.data[0]))
 
-        return net
+        return net, loss.data[0]
 
 # =====================================================================
 
@@ -345,9 +349,9 @@ def learn_weights_code4(args):
 
     l = torch.median(l)
     print("\tReconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
-    print("\t\tWeights view : " + str(weights[:,:]))
-    print("\t\tMean Relative Error : " + str(l.data))
-    return(weights)
+    print("\tWeights view : " + str(weights[:,:]))
+    print("\tMean Relative Error : " + str(l.data.numpy()[0]))
+    return weights, (loss.data[0], l.data[0])
 
 # =====================================================================
 
@@ -411,11 +415,18 @@ def learn_ClassifierNet(args):
 
     predictions = net.getClasses(data_test_in)
     accuracy = torch.sum(torch.eq(predictions, data_test_out)).float()/len(data_test_out)
-    accuracy = str(accuracy.data[0])
 
-    print("\tClassifier " + str(i) + " - accuracy : " + accuracy)
+    print("\tClassifier " + str(i) + " - accuracy : " + str(accuracy.data[0]))
 
-    return net
+    return net, accuracy.data[0]
+
+# =====================================================================
+
+def learn_Clustering(args):
+    model = cluster.SpectralClustering(n_clusters = 3)
+    model.fit(args["data_in"].data.numpy())
+    print("nClusters view " + str(args["id_in"]) + " : " + str(len(set(model.labels_))))
+    return model
 
 # =====================================================================
 
@@ -491,6 +502,8 @@ def learnCollabSystem3(train_datasets, test_datasets, options) :
 
 def learnCollabSystem4(train_datasets, test_datasets, options) :
 
+    results = {}
+
     # PARAMETERS
     NVIEWS = len(train_datasets)
 
@@ -506,17 +519,20 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
         
         print("\tTrain a priori : " + str(train_apriori))
         print("\tTest a priori : " + str(test_apriori))
+        results["error_apriori_train"] = train_apriori
+        results["error_apriori_test"] = test_apriori
 
         args = get_args_to_map_classifiers(train_datasets, test_datasets, train_labels, test_labels, options)
-        # classifiers = p.map(learn_ClassifierNet, args)
+        # clusterings = list(learn_Clustering(arg) for arg in args)
         classifiers = list(learn_ClassifierNet(arg) for arg in args)
+        classifiers, results["error_classifiers_test"] = extract_results(classifiers)
         test = classifiers[0].forward(train_datasets[0])
 
     # LEARNING ALL THE MODELS AND GET THE CODES
     print("Learning autoencoders...")
     args = get_args_to_map_AE(train_datasets, test_datasets, options)
-    # models = p.map(learn_AENet, args)
     models = list(learn_AENet(arg) for arg in args)
+    models, results["error_autoencoders_test"] = extract_results(models)
 
     codes = list()
     codes_test = list()
@@ -533,9 +549,9 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
     # LEARNING OF THE LINKS
     print("Learnings links...")
     args = get_args_to_map_links4(codes, codes_test, train_datasets, test_datasets, options)
-    # links_tmp = p.map(learn_LinkNet, args)
     if options["version"] == 4 :
         links_tmp = list(learn_LinkNet(arg) for arg in args)
+        links_tmp, results["error_links_test"] = extract_results(links_tmp)
     elif options["version"] == 5 :
         links_tmp = list(learn_GeminiLinkNet(arg) for arg in args)
 
@@ -547,14 +563,22 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
 
     print("Learning weights and final reconstruction...")
     args = get_args_to_map_weights4(codes, codes_test, train_datasets, test_datasets, models, links, options)
-    # weights = p.map(learn_weights_code3, args)
     weights = list(learn_weights_code4(arg) for arg in args)
-
+    weights, results["error_MSE_&_relative_per_feature_test"] = extract_results(weights)
     cs = CollabSystem4(models, links, weights)
 
     print("Classification of the reconstruction")
+    results["error_classifiers_final_test"] = []
     for i in range(NVIEWS):
         output = cs.forward(i, test_datasets)
-        output = classifiers[i].getClasses(output)
-        output = torch.sum(torch.eq(output, test_labels)).float()/len(test_labels)
-        print("\tAccuracy view " + str(i) + " : " + str(output.data[0]))
+        output1 = classifiers[i].getClasses(output)
+        output1 = torch.sum(torch.eq(output1, test_labels)).float()/len(test_labels)
+        results["error_classifiers_final_test"].append(output1.data[0])
+        print("\tAccuracy view " + str(i) + " : " + str(output1.data[0]))
+
+    return results
+
+        # output2 = clusterings[i].fit_predict(output.data.numpy())
+        # target2 = clusterings[i].fit_predict(test_datasets[i].data.numpy())
+        # print("\tClustering view " + str(i) + " : " + str((output2 == target2).sum()/output2.size))
+        # print(str(confusion_matrix(output2, target2)))

@@ -2,8 +2,7 @@ __pycache__/
 bin/
 compiler_compat/
 conda-meta/
-data/dir_data.tar
-data/dir_data/
+data/
 doc/
 etc/
 include/
@@ -21,3 +20,4 @@ var/
 x86_64-conda_cos6-linux-gnu/
 pkgs/
 python-driver/
+img/
