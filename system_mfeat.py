@@ -16,6 +16,8 @@ BIG_TEST_ITER = 20
 NSTEPS = 5000
 NSTEPS_WEIGHTS = 2000
 
+NOISY_ON_DATA = True
+
 LAYERS_AE = [150, 20]
 LAYERS_LINKS = [150]
 LAYERS_CLASSIF = [150]
@@ -28,7 +30,7 @@ LEARNING_RATE_WEIGHTS = 0.01
 MOMENTUM = 0.9
 PATIENCE = 200
 
-LEARN_WEIGHTS = False
+LEARN_WEIGHTS = True
 
 version = 4
 clampOutput = False if version == 4 else True
@@ -55,6 +57,8 @@ for file in ["fac", "fou", "kar", "mor", "pix", "zer"] :
     data = pd.read_csv("data/mfeat/mfeat-" + file, header=None, delim_whitespace=True)
     data = np.array(data, dtype='float')
     data = scale(data)
+    if NOISY_ON_DATA :
+        data += np.random.normal(size=data.shape, scale=1)
     np.random.set_state(state)
     np.random.shuffle(data)
     train_datasets.append(Variable(torch.from_numpy(data[:-200,:]).float()))
@@ -100,7 +104,7 @@ elif version == 4 or version == 5:
             print("Test " + str(i))
             print("Begin time : " + str(time.localtime()))
             results = learnCollabSystem4(train_datasets, test_datasets, options)
-            f = "data/mfeat/results_sans_weights/results_" + str(i)
+            f = "data/mfeat/results_standard_noisy/results_" + str(i)
             f = open(f, "w+b")
             pickle.dump(results, f)
             f.close()
