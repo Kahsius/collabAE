@@ -1,10 +1,13 @@
 import sys
 import torch
 import torch.nn as nn
+import functools as ft
 import torch.optim as optim
+import collections.Iterable
 import sklearn.cluster as cluster
 
 from copy import deepcopy
+from itertools import tee
 from collections import Counter
 from torch.autograd import Variable
 from sklearn.metrics import confusion_matrix
@@ -31,11 +34,17 @@ def learn_AENet(args):
         test_fail = 0
         min_test = float("inf")
         min_model = object()
-        for epoch in range(options["NSTEPS"]):
 
+        # Modification de dataset_test pour gérer les itérables
+        if isinstance(dataset, Iterable):
+            copy_dataset = tee(dataset, n=1)
+        else :
+            copy_dataset = iter([dataset])
+
+        for epoch in range(options["NSTEPS"]):
             # Test information
             outputs = net(dataset_test)
-            loss = criterion(outputs, dataset_test)
+            loss = criterion(outputs, chunk)
             if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_net == 0: 
                 print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
 
@@ -51,16 +60,17 @@ def learn_AENet(args):
                 test_fail = 0
                 min_model = deepcopy(net)
 
-            optimizer.zero_grad()
-            
-            # Train information
-            outputs = net(dataset)
-            loss = criterion(outputs, dataset)
+            for chunk in copy_dataset :
+                optimizer.zero_grad()
+                
+                # Train information
+                outputs = net(chunk)
+                loss = criterion(outputs, chunk)
 
-            # Parameters optimization
-            loss.backward()
-            optimizer.step()
-            scheduler.step(loss.data[0])
+                # Parameters optimization
+                loss.backward()
+                optimizer.step()
+                scheduler.step(loss.data[0])
 
         outputs = net(dataset_test)
         loss = criterion(outputs, dataset_test)
@@ -83,8 +93,24 @@ def learn_LinkNet(args):
         data_test_in = args["test_in"]
         data_test_out = args["test_out"]
 
-        dimData_in = data_in.size()[1]
-        dimData_out = data_out.size()[1]
+
+        # Modification de dataset_test pour récupérer les dimensions
+        if isinstance(dataset, Iterable):
+            copy_data_in = tee(data_in, n=1)
+            copy_data_out = tee(data_out, n=1)
+        else :
+            copy_data_in = iter([data_in])
+            copy_data_out = iter([data_out])
+        dimData_in = copy_data_in.__next__().size()[1]
+        dimData_out = copy_data_out.__next__().size()[1]
+
+        # Modification de dataset_test pour gérer les itérables
+        if isinstance(dataset, Iterable):
+            copy_data_in = tee(data_in, n=1)
+            copy_data_out = tee(data_out, n=1)
+        else :
+            copy_data_in = iter([data_in])
+            copy_data_out = iter([data_out])
 
         # DEFINE THE MODEL
         net = LinkNet( [dimData_in] + options["LAYERS_LINKS"] + [dimData_out], options["clampOutput"] )
@@ -118,16 +144,17 @@ def learn_LinkNet(args):
                 test_fail = 0
                 min_model = deepcopy(net)
 
-            optimizer.zero_grad()
-            
-            # Train information
-            outputs = net(data_in)
-            loss = criterion(outputs, data_out)
+            for chunk_in, chunk_out in zip(copy_data_in, copy_data_out) :
+                optimizer.zero_grad()
+                
+                # Train information
+                outputs = net(chunk_in)
+                loss = criterion(outputs, chunk_out)
 
-            # Parameters optimization
-            loss.backward()
-            optimizer.step()
-            scheduler.step(loss.data[0])
+                # Parameters optimization
+                loss.backward()
+                optimizer.step()
+                scheduler.step(loss.data[0])
 
         outputs = net(data_test_in)
         loss = criterion(outputs, data_test_out)
@@ -293,6 +320,13 @@ def learn_weights_code4(args):
     train_dataset = args["train_dataset"]
     test_dataset = args["test_dataset"]
 
+    if isinstance(codes[0], Iterable):
+        codes = [tee(code, n=1) for code in codes]
+        train_dataset = tee(train_dataset, n=1)
+    else :
+        codes = [iter([code]) for code in codes]
+        train_dataset = iter([train_dataset])
+
     options = args["options"]
 
     NVIEWS = len(codes)
@@ -313,10 +347,9 @@ def learn_weights_code4(args):
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30)
         
         for epoch in range(options["NSTEPS_WEIGHTS"]):
-            optimizer.zero_grad()
 
-            indiv_reconstruit = get_weighted_outputs(id_view, codes, links, weights)
-            loss = criterion(indiv_reconstruit, train_dataset)
+            indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
+            loss = criterion(indiv_reconstruit, test_dataset)
 
             if loss.data[0] > best_error :
                 test_fail += 1
@@ -329,14 +362,19 @@ def learn_weights_code4(args):
                 test_fail = 0
                 min_weights = (Variable(weights.data, requires_grad=True))  
 
-            loss.backward()
-            optimizer.step()
-            scheduler.step(loss.data[0])
-
             if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_view == 0:
-                indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
-                loss = criterion(indiv_reconstruit, test_dataset)
                 print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
+
+            for chunk_codes in zip(*codes, train_dataset)
+                optimizer.zero_grad()
+
+                indiv_reconstruit = get_weighted_outputs(id_view, chunk_codes[:-1], links, weights)
+                loss = criterion(indiv_reconstruit, chunk_codes[-1])
+                
+                loss.backward()
+                optimizer.step()
+                scheduler.step(loss.data[0])
+
 
     # weights = normalize_weights(weights, id_view)
     indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
@@ -363,8 +401,24 @@ def learn_ClassifierNet(args):
     data_out = args["data_out"]
     data_test_in = args["test_in"]
     data_test_out = args["test_out"]
-    dimData_in = data_in.size()[1]
-    dimData_out = torch.max(data_out) + 1
+
+    # Modification de dataset_test pour récupérer les dimensions
+    if isinstance(dataset, Iterable):
+        copy_data_in = tee(data_in, n=1)
+        copy_data_out = tee(data_out, n=1)
+    else :
+        copy_data_in = iter([data_in])
+        copy_data_out = iter([data_out])
+    dimData_in = copy_data_in.__next__().size()[1]
+    dimData_out = torch.max(copy_data_out.__next__()) + 1
+
+    # Modification de dataset_test pour gérer les itérables
+    if isinstance(dataset, Iterable):
+        copy_data_in = tee(data_in, n=1)
+        copy_data_out = tee(data_out, n=1)
+    else :
+        copy_data_in = iter([data_in])
+        copy_data_out = iter([data_out])
 
     # DEFINE THE MODEL
     net = ClassifNet( [dimData_in] + options["LAYERS_CLASSIF"] + [dimData_out.data[0]] )
@@ -398,16 +452,17 @@ def learn_ClassifierNet(args):
             test_fail = 0
             min_model = deepcopy(net)
 
-        optimizer.zero_grad()
-        
-        # Train information
-        outputs = net(data_in)
-        loss = criterion(outputs, data_out)
+        for chunk_in, chunk_out in zip(copy_data_in, copy_data_out) :
+            optimizer.zero_grad()
+            
+            # Train information
+            outputs = net(chunk_in)
+            loss = criterion(outputs, chunk_out)
 
-        # Parameters optimization
-        loss.backward()
-        optimizer.step()
-        scheduler.step(loss.data[0])
+            # Parameters optimization
+            loss.backward()
+            optimizer.step()
+            scheduler.step(loss.data[0])
 
     # outputs = net(data_test_in)
     # loss = criterion(outputs, data_test_out)
@@ -526,7 +581,6 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
         # clusterings = list(learn_Clustering(arg) for arg in args)
         classifiers = list(learn_ClassifierNet(arg) for arg in args)
         classifiers, results["error_classifiers_test"] = extract_results(classifiers)
-        test = classifiers[0].forward(train_datasets[0])
 
     # LEARNING ALL THE MODELS AND GET THE CODES
     print("Learning autoencoders...")
@@ -537,13 +591,23 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
     codes = list()
     codes_test = list()
     for i in range(NVIEWS):
-        # Codes gathering
-        code = models[i].encode(train_datasets[i])
-        code = Variable(code.data, requires_grad = False)
-        codes.append(code)
+        train = train_datasets[i]
+        test = test_datasets[i]
 
-        code_test = models[i].encode(test_datasets[i])
-        code_test = Variable(code_test.data, requires_grad = False)
+            # Codes gathering
+        if isinstance(train, Iterable)
+            code = map(lambda chunk: models[i].encode(chunk), train)
+            code = map(lambda chunk : Variable(code.data, requires_grad = False))
+
+            code_test = map(lambda chunk: models[i].encode(chunk), train)
+            code_test = map(lambda chunk : Variable(code.data, requires_grad = False))
+        else 
+            code = models[i].encode(train)
+            code = Variable(code.data, requires_grad = False)
+
+            code_test = models[i].encode(test)
+            code_test = Variable(code_test.data, requires_grad = False)
+        codes.append(code)
         codes_test.append(code_test)
 
     # LEARNING OF THE LINKS
