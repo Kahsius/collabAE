@@ -9,6 +9,9 @@ class AENet(nn.Module):
         super(AENet, self).__init__()
         self.n_hidden_layers = len(arrDim) - 1
 
+        # Normalizing function
+        #self.normalize = nn.BatchNorm1d(arrDim[0], affine=False)
+
         # Encoding functions
         for i in range(self.n_hidden_layers) :
             f = nn.Linear(arrDim[i], arrDim[i+1])
@@ -27,6 +30,7 @@ class AENet(nn.Module):
         return x
 
     def encode(self, x):
+        #x = self.normalize(x)
         for i in range(self.n_hidden_layers - 1) :
             name = "fct" + str(i)
             fct = getattr(self, name)

@@ -1,9 +1,9 @@
+import sys
 import pandas as pd
 import torch
 import functools as ft
 from torch.autograd import Variable
 from numpy import asarray
-from sys import exit
 
 
 def getIndexesViews(dimData, nViews):

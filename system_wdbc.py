@@ -6,9 +6,9 @@ import pickle
 import sys
 from sklearn.preprocessing import scale
 
-VERBOSE = False
+VERBOSE = True
 VERBOSE_STEP = 100
-BIG_TEST = True
+BIG_TEST = False
 BIG_TEST_ITER = 50
 
 # NOISE TYPE
@@ -20,7 +20,7 @@ NOISY_VIEW_0 = False
 NVIEWS = 3
 PTEST = .1
 
-NSTEPS = 10000
+NSTEPS = 2000
 NSTEPS_WEIGHTS = 2000
 
 LOSS_METHOD = nn.MSELoss()
@@ -35,7 +35,7 @@ LEARNING_RATE_LINKS = 0.05
 LEARNING_RATE_CLASSIF = 0.03
 LEARNING_RATE_WEIGHTS = 0.05
 
-LEARN_WEIGHTS = False
+LEARN_WEIGHTS = True
 
 MOMENTUM = 0.9
 PATIENCE = 200
@@ -73,15 +73,6 @@ train_labels = Variable(torch.LongTensor(labels[nTest:]))
 indexes = getIndexesViews(dimData, NVIEWS)
 train_datasets = getViewsFromIndexes(train_data, indexes)
 test_datasets = getViewsFromIndexes(test_data, indexes)
-
-# test pour comparaison avec la mse
-tmp = test_datasets[0].data.numpy()
-print(tmp)
-tmp = np.linalg.norm(tmp, axis=1)
-print(tmp)
-tmp = np.mean(tmp*tmp)
-print(tmp)
-sys.exit()
 
 if NOISY_VIEW :
 	train_datasets.append(Variable(torch.from_numpy(np.random.normal(size=(nData-nTest, 10))).float()))

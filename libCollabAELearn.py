@@ -1,16 +1,13 @@
 import sys
 import torch
 import torch.nn as nn
-import functools as ft
 import torch.optim as optim
-import collections.Iterable
 import sklearn.cluster as cluster
 
 from copy import deepcopy
 from itertools import tee
-from collections import Counter
+from collections import Counter, Iterator
 from torch.autograd import Variable
-from sklearn.metrics import confusion_matrix
 
 from libCollabAEClasses import *
 from libCollabAEUtils import *
@@ -35,16 +32,16 @@ def learn_AENet(args):
         min_test = float("inf")
         min_model = object()
 
-        # Modification de dataset_test pour gérer les itérables
-        if isinstance(dataset, Iterable):
-            copy_dataset = tee(dataset, n=1)
-        else :
-            copy_dataset = iter([dataset])
 
         for epoch in range(options["NSTEPS"]):
+            # Modification de dataset_test pour gérer les itérables
+            if isinstance(dataset, Iterator):
+                copy_dataset = tee(dataset, n=1)
+            else :
+                copy_dataset = iter([dataset])
             # Test information
             outputs = net(dataset_test)
-            loss = criterion(outputs, chunk)
+            loss = criterion(outputs, dataset_test)
             if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_net == 0: 
                 print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
 
@@ -95,7 +92,7 @@ def learn_LinkNet(args):
 
 
         # Modification de dataset_test pour récupérer les dimensions
-        if isinstance(dataset, Iterable):
+        if isinstance(data_in, Iterator):
             copy_data_in = tee(data_in, n=1)
             copy_data_out = tee(data_out, n=1)
         else :
@@ -103,14 +100,6 @@ def learn_LinkNet(args):
             copy_data_out = iter([data_out])
         dimData_in = copy_data_in.__next__().size()[1]
         dimData_out = copy_data_out.__next__().size()[1]
-
-        # Modification de dataset_test pour gérer les itérables
-        if isinstance(dataset, Iterable):
-            copy_data_in = tee(data_in, n=1)
-            copy_data_out = tee(data_out, n=1)
-        else :
-            copy_data_in = iter([data_in])
-            copy_data_out = iter([data_out])
 
         # DEFINE THE MODEL
         net = LinkNet( [dimData_in] + options["LAYERS_LINKS"] + [dimData_out], options["clampOutput"] )
@@ -125,6 +114,13 @@ def learn_LinkNet(args):
         min_test = float("inf")
         min_model = object()
         for epoch in range(options["NSTEPS"]):
+            # Modification de dataset_test pour gérer les itérables
+            if isinstance(data_in, Iterator):
+                copy_data_in = tee(data_in, n=1)
+                copy_data_out = tee(data_out, n=1)
+            else :
+                copy_data_in = iter([data_in])
+                copy_data_out = iter([data_out])
 
             # Test information
             outputs = net(data_test_in)
@@ -320,16 +316,11 @@ def learn_weights_code4(args):
     train_dataset = args["train_dataset"]
     test_dataset = args["test_dataset"]
 
-    if isinstance(codes[0], Iterable):
-        codes = [tee(code, n=1) for code in codes]
-        train_dataset = tee(train_dataset, n=1)
-    else :
-        codes = [iter([code]) for code in codes]
-        train_dataset = iter([train_dataset])
-
     options = args["options"]
 
     NVIEWS = len(codes)
+
+    print(codes)
 
     # TESTING THE RECONSTRUCTION
     # PROTO WEIGTHING WITH GRAD
@@ -347,6 +338,12 @@ def learn_weights_code4(args):
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30)
         
         for epoch in range(options["NSTEPS_WEIGHTS"]):
+            if isinstance(codes[0], Iterator):
+                codes_tmp = [tee(code, 1) for code in codes]
+                train_dataset_tmp = tee(train_dataset, 1)
+            else :
+                codes_tmp = [iter([code]) for code in codes]
+                train_dataset_tmp = iter([train_dataset])
 
             indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
             loss = criterion(indiv_reconstruit, test_dataset)
@@ -365,7 +362,7 @@ def learn_weights_code4(args):
             if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_view == 0:
                 print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
 
-            for chunk_codes in zip(*codes, train_dataset)
+            for chunk_codes in zip(*codes_tmp, train_dataset_tmp):
                 optimizer.zero_grad()
 
                 indiv_reconstruit = get_weighted_outputs(id_view, chunk_codes[:-1], links, weights)
@@ -388,7 +385,7 @@ def learn_weights_code4(args):
     l = torch.median(l)
     print("\tReconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
     print("\tWeights view : " + str(weights[:,:]))
-    print("\tMean Relative Error : " + str(l.data.numpy()[0]))
+    # print("\tMean Relative Error : " + str(l.data.numpy()[0]))
     return weights, (loss.data[0], l.data[0])
 
 # =====================================================================
@@ -403,7 +400,7 @@ def learn_ClassifierNet(args):
     data_test_out = args["test_out"]
 
     # Modification de dataset_test pour récupérer les dimensions
-    if isinstance(dataset, Iterable):
+    if isinstance(data_in, Iterator):
         copy_data_in = tee(data_in, n=1)
         copy_data_out = tee(data_out, n=1)
     else :
@@ -412,13 +409,6 @@ def learn_ClassifierNet(args):
     dimData_in = copy_data_in.__next__().size()[1]
     dimData_out = torch.max(copy_data_out.__next__()) + 1
 
-    # Modification de dataset_test pour gérer les itérables
-    if isinstance(dataset, Iterable):
-        copy_data_in = tee(data_in, n=1)
-        copy_data_out = tee(data_out, n=1)
-    else :
-        copy_data_in = iter([data_in])
-        copy_data_out = iter([data_out])
 
     # DEFINE THE MODEL
     net = ClassifNet( [dimData_in] + options["LAYERS_CLASSIF"] + [dimData_out.data[0]] )
@@ -433,6 +423,13 @@ def learn_ClassifierNet(args):
     min_test = float("inf")
     min_model = object()
     for epoch in range(options["NSTEPS"]):
+        # Modification de dataset_test pour gérer les itérables
+        if isinstance(data_in, Iterator):
+            copy_data_in = tee(data_in, n=1)
+            copy_data_out = tee(data_out, n=1)
+        else :
+            copy_data_in = iter([data_in])
+            copy_data_out = iter([data_out])
 
         # Test information
         outputs = net(data_test_in)
@@ -527,7 +524,7 @@ def learnCollabSystem3(train_datasets, test_datasets, options) :
         code_test = Variable(code_test.data, requires_grad = False)
         codes_test.append(code_test)
 
-    # LEARNING OF THE LINKS
+    # LEARNING OF THE LINKS
     print("Learnings links...")
     args = get_args_to_map_links3(codes, codes_test, train_datasets, test_datasets, options)
     # links_tmp = p.map(learn_LinkNet, args)
@@ -595,13 +592,13 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
         test = test_datasets[i]
 
             # Codes gathering
-        if isinstance(train, Iterable)
+        if isinstance(train, Iterator):
             code = map(lambda chunk: models[i].encode(chunk), train)
             code = map(lambda chunk : Variable(code.data, requires_grad = False))
 
             code_test = map(lambda chunk: models[i].encode(chunk), train)
             code_test = map(lambda chunk : Variable(code.data, requires_grad = False))
-        else 
+        else :
             code = models[i].encode(train)
             code = Variable(code.data, requires_grad = False)
 
@@ -610,7 +607,7 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
         codes.append(code)
         codes_test.append(code_test)
 
-    # LEARNING OF THE LINKS
+    # LEARNING OF THE LINKS
     print("Learnings links...")
     args = get_args_to_map_links4(codes, codes_test, train_datasets, test_datasets, options)
     if options["version"] == 4 :
