@@ -1,11 +1,13 @@
-from libCollabAELearn import *
-
-import torch
-from torch.autograd import Variable
-import pandas as pd
-import numpy as np
+import pickle
+import time
 
 from sklearn.preprocessing import scale
+import torch
+from torch.autograd import Variable
+
+from libCollabAELearn import *
+import pandas as pd
+
 
 # OPTIONS
 VERBOSE = True
@@ -40,7 +42,6 @@ clampOutput = False if version == 4 else True
 LOSS_METHOD = nn.MSELoss()
 
 # GET DATA
-print("{0} tracks described by {1} features".format(*features.shape))
 columns = ['mfcc', 'chroma_cens', 'tonnetz', 'spectral_contrast', 'spectral_centroid', 'spectral_bandwidth', 'spectral_rolloff', 'rmse', 'zcr']
 
 train_datasets = []
@@ -49,17 +50,18 @@ test_datasets = []
 for column in columns :
     data = pd.read_csv("data/fma/"+column+"_train.csv",
         chunksize=CHUNKSIZE)
-    data = map(lambda chunk: Variable(chunk.values))
+    data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).float()), data)
     train_datasets.append(data)
 
-    data = pd.read_csv("data/fma/"+column"_test_csv")
+    data = pd.read_csv("data/fma/"+column+"_test.csv")
     test_datasets.append(data)
 
 NVIEWS = len(columns)
 
 train_labels = pd.read_csv("data/fma/labels_train.csv",
     chunksize=CHUNKSIZE)
-test_labels = pd.read_csv("data/fma/labels_test.csv")
+train_labels = map(lambda chunk: Variable(torch.from_numpy(chunk.values).squeeze().int()), train_labels)
+test_labels = Variable(torch.from_numpy(pd.read_csv("data/fma/labels_test.csv").values).squeeze().int())
 
 options = {
     "VERBOSE" : VERBOSE,

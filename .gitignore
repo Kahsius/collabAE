@@ -23,3 +23,5 @@ x86_64-conda_cos6-linux-gnu/
 pkgs/
 python-driver/
 img/
+.project
+.pydevproject

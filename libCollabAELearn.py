@@ -36,7 +36,7 @@ def learn_AENet(args):
         for epoch in range(options["NSTEPS"]):
             # Modification de dataset_test pour gérer les itérables
             if isinstance(dataset, Iterator):
-                copy_dataset = tee(dataset, n=1)
+                copy_dataset = tee(dataset, 1)[0]
             else :
                 copy_dataset = iter([dataset])
             # Test information
@@ -93,8 +93,8 @@ def learn_LinkNet(args):
 
         # Modification de dataset_test pour récupérer les dimensions
         if isinstance(data_in, Iterator):
-            copy_data_in = tee(data_in, n=1)
-            copy_data_out = tee(data_out, n=1)
+            copy_data_in = tee(data_in, 1)[0]
+            copy_data_out = tee(data_out, 1)[0]
         else :
             copy_data_in = iter([data_in])
             copy_data_out = iter([data_out])
@@ -116,8 +116,8 @@ def learn_LinkNet(args):
         for epoch in range(options["NSTEPS"]):
             # Modification de dataset_test pour gérer les itérables
             if isinstance(data_in, Iterator):
-                copy_data_in = tee(data_in, n=1)
-                copy_data_out = tee(data_out, n=1)
+                copy_data_in = tee(data_in, 1)[0]
+                copy_data_out = tee(data_out, 1)[0]
             else :
                 copy_data_in = iter([data_in])
                 copy_data_out = iter([data_out])
@@ -339,8 +339,8 @@ def learn_weights_code4(args):
         
         for epoch in range(options["NSTEPS_WEIGHTS"]):
             if isinstance(codes[0], Iterator):
-                codes_tmp = [tee(code, 1) for code in codes]
-                train_dataset_tmp = tee(train_dataset, 1)
+                codes_tmp = [tee(code, 1)[0] for code in codes]
+                train_dataset_tmp = tee(train_dataset, 1)[0]
             else :
                 codes_tmp = [iter([code]) for code in codes]
                 train_dataset_tmp = iter([train_dataset])
@@ -401,8 +401,8 @@ def learn_ClassifierNet(args):
 
     # Modification de dataset_test pour récupérer les dimensions
     if isinstance(data_in, Iterator):
-        copy_data_in = tee(data_in, n=1)
-        copy_data_out = tee(data_out, n=1)
+        copy_data_in = tee(data_in, 1)[0]
+        copy_data_out = tee(data_out, 1)[0]
     else :
         copy_data_in = iter([data_in])
         copy_data_out = iter([data_out])
@@ -425,8 +425,8 @@ def learn_ClassifierNet(args):
     for epoch in range(options["NSTEPS"]):
         # Modification de dataset_test pour gérer les itérables
         if isinstance(data_in, Iterator):
-            copy_data_in = tee(data_in, n=1)
-            copy_data_out = tee(data_out, n=1)
+            copy_data_in = tee(data_in, 1)[0]
+            copy_data_out = tee(data_out, 1)[0]
         else :
             copy_data_in = iter([data_in])
             copy_data_out = iter([data_out])
@@ -562,16 +562,16 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
     if "train_labels" in options :
         print("Learning classifiers...")
         train_labels = options["train_labels"]
-        tmp = Counter(train_labels.data.numpy())
-        train_apriori = float(tmp.most_common(1)[0][1])/len(train_labels.data)
+        # tmp = Counter(train_labels.data.numpy())
+        # train_apriori = float(tmp.most_common(1)[0][1])/len(train_labels.data)
 
         test_labels = options["test_labels"]
         tmp = Counter(test_labels.data.numpy())
         test_apriori = float(tmp.most_common(1)[0][1])/len(test_labels.data)
         
-        print("\tTrain a priori : " + str(train_apriori))
+        # print("\tTrain a priori : " + str(train_apriori))
         print("\tTest a priori : " + str(test_apriori))
-        results["error_apriori_train"] = train_apriori
+        # results["error_apriori_train"] = train_apriori
         results["error_apriori_test"] = test_apriori
 
         args = get_args_to_map_classifiers(train_datasets, test_datasets, train_labels, test_labels, options)
