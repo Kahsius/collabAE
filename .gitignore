@@ -25,3 +25,5 @@ python-driver/
 img/
 .project
 .pydevproject
+*.swp
+.exrc

@@ -356,3 +356,30 @@ def extract_results(l):
         objects.append(t[0])
         results.append(t[1])
     return objects, results
+
+# =====================================================================
+
+def get_iterator(filename, chunksize, datatype):
+    data = pd.read_csv(filename, chunksize=chunksize)
+    if datatype == "float" :
+        data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).float()), data)
+    elif datatype == "long" :
+        data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).long()), data)
+    else :
+        sys.exit("Error, type {} undefined".format(datatype)) 
+    return data
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+

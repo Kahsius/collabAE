@@ -1,5 +1,6 @@
-import pickle
+import pdb
 import time
+import pickle
 
 from sklearn.preprocessing import scale
 import torch
@@ -54,14 +55,14 @@ for column in columns :
     train_datasets.append(data)
 
     data = pd.read_csv("data/fma/"+column+"_test.csv")
-    test_datasets.append(data)
+    test_datasets.append(Variable(torch.from_numpy(data.values).float()))
 
 NVIEWS = len(columns)
 
 train_labels = pd.read_csv("data/fma/labels_train.csv",
     chunksize=CHUNKSIZE)
-train_labels = map(lambda chunk: Variable(torch.from_numpy(chunk.values).squeeze().int()), train_labels)
-test_labels = Variable(torch.from_numpy(pd.read_csv("data/fma/labels_test.csv").values).squeeze().int())
+train_labels = map(lambda chunk: Variable(torch.from_numpy(chunk.values).squeeze().long()), train_labels)
+test_labels = Variable(torch.from_numpy(pd.read_csv("data/fma/labels_test.csv").values).squeeze().long())
 
 options = {
     "VERBOSE" : VERBOSE,
@@ -82,7 +83,9 @@ options = {
     "train_labels" : train_labels,
     "test_labels" : test_labels,
     "clampOutput" : clampOutput,
-    "version" : version
+    "version" : version,
+    "nLabels" : 16,
+    "CHUNKSIZE": CHUNKSIZE
 }
 
 if version == 3 :

@@ -1,4 +1,5 @@
 import sys
+import pdb
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -393,6 +394,7 @@ def learn_weights_code4(args):
 def learn_ClassifierNet(args):
     i = args["id_in"]
     options = args["options"]
+    dimData_out = options["nLabels"]
 
     data_in = args["data_in"]
     data_out = args["data_out"]
@@ -407,11 +409,10 @@ def learn_ClassifierNet(args):
         copy_data_in = iter([data_in])
         copy_data_out = iter([data_out])
     dimData_in = copy_data_in.__next__().size()[1]
-    dimData_out = torch.max(copy_data_out.__next__()) + 1
 
 
     # DEFINE THE MODEL
-    net = ClassifNet( [dimData_in] + options["LAYERS_CLASSIF"] + [dimData_out.data[0]] )
+    net = ClassifNet( [dimData_in] + options["LAYERS_CLASSIF"] + [dimData_out] )
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD( net.parameters(), \
         lr=options["LEARNING_RATE_CLASSIF"], \
@@ -425,6 +426,7 @@ def learn_ClassifierNet(args):
     for epoch in range(options["NSTEPS"]):
         # Modification de dataset_test pour gérer les itérables
         if isinstance(data_in, Iterator):
+            pdb.set_trace()
             copy_data_in = tee(data_in, 1)[0]
             copy_data_out = tee(data_out, 1)[0]
         else :
