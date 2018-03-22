@@ -20,7 +20,12 @@ def learn_AENet(args):
         options = args["options"]
         id_net = args["id_net"]
 
-        dimData = dataset.size()[1]
+        if isinstance(dataset, str):
+            # copy_dataset = tee(dataset, 1)[0]
+            copy_dataset = get_iterator(dataset, options["CHUNKSIZE"], "float")
+        else :
+            copy_dataset = iter([dataset])
+        dimData = copy_dataset.__next__().size()[1]
 
         # MODEL DEFINITION
         net = AENet( [dimData] + options["LAYERS_AE"] )
