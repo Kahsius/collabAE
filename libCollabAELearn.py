@@ -7,7 +7,7 @@ import sklearn.cluster as cluster
 
 from copy import deepcopy
 from itertools import tee
-from collections import Counter, Iterator
+from collections import Counter 
 from torch.autograd import Variable
 
 from libCollabAEClasses import *
@@ -36,8 +36,9 @@ def learn_AENet(args):
 
         for epoch in range(options["NSTEPS"]):
             # Modification de dataset_test pour gérer les itérables
-            if isinstance(dataset, Iterator):
-                copy_dataset = tee(dataset, 1)[0]
+            if isinstance(dataset, str):
+                # copy_dataset = tee(dataset, 1)[0]
+                copy_dataset = get_iterator(dataset, options["CHUNKSIZE"], "float")
             else :
                 copy_dataset = iter([dataset])
             # Test information
@@ -93,9 +94,11 @@ def learn_LinkNet(args):
 
 
         # Modification de dataset_test pour récupérer les dimensions
-        if isinstance(data_in, Iterator):
-            copy_data_in = tee(data_in, 1)[0]
-            copy_data_out = tee(data_out, 1)[0]
+        if isinstance(data_in, str):
+            # copy_data_in = tee(data_in, 1)[0]
+            # copy_data_out = tee(data_out, 1)[0]
+            copy_data_in = get_iterator(data_in, options["CHUNKSIZE"], "float")
+            copy_data_out = get_iterator(data_out, options["CHUNKSIZE"], "float")
         else :
             copy_data_in = iter([data_in])
             copy_data_out = iter([data_out])
@@ -116,9 +119,11 @@ def learn_LinkNet(args):
         min_model = object()
         for epoch in range(options["NSTEPS"]):
             # Modification de dataset_test pour gérer les itérables
-            if isinstance(data_in, Iterator):
-                copy_data_in = tee(data_in, 1)[0]
-                copy_data_out = tee(data_out, 1)[0]
+            if isinstance(data_in, str):
+               # copy_data_in = tee(data_in, 1)[0]
+               # copy_data_out = tee(data_out, 1)[0]
+                copy_data_in = get_iterator(data_in, options["CHUNKSIZE"], "float")
+                copy_data_out = get_iterator(data_out, options["CHUNKSIZE"], "float")
             else :
                 copy_data_in = iter([data_in])
                 copy_data_out = iter([data_out])
@@ -339,9 +344,11 @@ def learn_weights_code4(args):
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30)
         
         for epoch in range(options["NSTEPS_WEIGHTS"]):
-            if isinstance(codes[0], Iterator):
-                codes_tmp = [tee(code, 1)[0] for code in codes]
-                train_dataset_tmp = tee(train_dataset, 1)[0]
+            if isinstance(codes[0], str):
+                # codes_tmp = [tee(code, 1)[0] for code in codes]
+                codes_tmp = [get_iterator(code, options["CHUNKSIZE"], "float") for code in codes]
+                # train_dataset_tmp = tee(train_dataset, 1)[0]
+                train_dataset_tmp = get_iterator(train_dataset, options["CHUNKSIZE"], "float")
             else :
                 codes_tmp = [iter([code]) for code in codes]
                 train_dataset_tmp = iter([train_dataset])
@@ -402,9 +409,11 @@ def learn_ClassifierNet(args):
     data_test_out = args["test_out"]
 
     # Modification de dataset_test pour récupérer les dimensions
-    if isinstance(data_in, Iterator):
-        copy_data_in = tee(data_in, 1)[0]
-        copy_data_out = tee(data_out, 1)[0]
+    if isinstance(data_in, str):
+        #copy_data_in = tee(data_in, 1)[0]
+        #copy_data_out = tee(data_out, 1)[0]
+        copy_data_in = get_iterator(data_in, options["CHUNKSIZE"], "float")
+        copy_data_out = get_iterator(data_out, options["CHUNKSIZE"], "long")
     else :
         copy_data_in = iter([data_in])
         copy_data_out = iter([data_out])
@@ -425,10 +434,11 @@ def learn_ClassifierNet(args):
     min_model = object()
     for epoch in range(options["NSTEPS"]):
         # Modification de dataset_test pour gérer les itérables
-        if isinstance(data_in, Iterator):
-            pdb.set_trace()
-            copy_data_in = tee(data_in, 1)[0]
-            copy_data_out = tee(data_out, 1)[0]
+        if isinstance(data_in, str):
+            # copy_data_in = tee(data_in, 1)[0]
+            # copy_data_out = tee(data_out, 1)[0]
+            copy_data_in = get_iterator(data_in, options["CHUNKSIZE"], "float")
+            copy_data_out = get_iterator(data_out, options["CHUNKSIZE"], "long")
         else :
             copy_data_in = iter([data_in])
             copy_data_out = iter([data_out])
@@ -518,13 +528,17 @@ def learnCollabSystem3(train_datasets, test_datasets, options) :
     codes_test = list()
     for i in range(NVIEWS):
         # Codes gathering
+        codename = "code"+i+".csv"
         code = models[i].encode(train_datasets[i])
-        code = Variable(code.data, requires_grad = False)
-        codes.append(code)
+        pd.DataFrame(code.data.numpy()).to_csv(codename)
+        # code = Variable(code.data, requires_grad = False)
+        codes.append(codename)
 
+        codename = "code_test"+i+".csv"
         code_test = models[i].encode(test_datasets[i])
-        code_test = Variable(code_test.data, requires_grad = False)
-        codes_test.append(code_test)
+        pd.DataFrame(code_test.data.numpy()).to_csv(codename)
+        # code_test = Variable(code_test.data, requires_grad = False)
+        codes_test.append(codename)
 
     # LEARNING OF THE LINKS
     print("Learnings links...")
@@ -594,7 +608,7 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
         test = test_datasets[i]
 
             # Codes gathering
-        if isinstance(train, Iterator):
+        if isinstance(train, str):
             code = map(lambda chunk: models[i].encode(chunk), train)
             code = map(lambda chunk : Variable(code.data, requires_grad = False))
 

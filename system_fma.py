@@ -17,9 +17,9 @@ BIG_TEST = False
 BIG_TEST_ITER = 20
 
 # HYPERPARAMETERS
-NSTEPS = 1000
-NSTEPS_WEIGHTS = 1000
-CHUNKSIZE = 100
+NSTEPS = 500
+NSTEPS_WEIGHTS = 500
+CHUNKSIZE = 1000
 
 NOISY_ON_DATA = False
 
@@ -49,9 +49,10 @@ train_datasets = []
 test_datasets = []
 
 for column in columns :
-    data = pd.read_csv("data/fma/"+column+"_train.csv",
-        chunksize=CHUNKSIZE)
-    data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).float()), data)
+#    data = pd.read_csv("data/fma/"+column+"_train.csv",
+#        chunksize=CHUNKSIZE)
+#    data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).float()), data)
+    data = "data/fma/"+column+"_train.csv"
     train_datasets.append(data)
 
     data = pd.read_csv("data/fma/"+column+"_test.csv")
@@ -59,9 +60,10 @@ for column in columns :
 
 NVIEWS = len(columns)
 
-train_labels = pd.read_csv("data/fma/labels_train.csv",
-    chunksize=CHUNKSIZE)
-train_labels = map(lambda chunk: Variable(torch.from_numpy(chunk.values).squeeze().long()), train_labels)
+train_labels = "data/fma/labels_train.csv"
+#train_labels = pd.read_csv("data/fma/labels_train.csv",
+#    chunksize=CHUNKSIZE)
+#train_labels = map(lambda chunk: Variable(torch.from_numpy(chunk.values).squeeze().long()), train_labels)
 test_labels = Variable(torch.from_numpy(pd.read_csv("data/fma/labels_test.csv").values).squeeze().long())
 
 options = {

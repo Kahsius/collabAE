@@ -364,7 +364,7 @@ def get_iterator(filename, chunksize, datatype):
     if datatype == "float" :
         data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).float()), data)
     elif datatype == "long" :
-        data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).long()), data)
+        data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).long().squeeze()), data)
     else :
         sys.exit("Error, type {} undefined".format(datatype)) 
     return data
