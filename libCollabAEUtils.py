@@ -362,9 +362,9 @@ def extract_results(l):
 def get_iterator(filename, chunksize, datatype):
     data = pd.read_csv(filename, chunksize=chunksize)
     if datatype == "float" :
-        data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).float()), data)
+        data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).float(), requires_grad=False), data)
     elif datatype == "long" :
-        data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).long().squeeze()), data)
+        data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).long().squeeze(), requires_grad=False), data)
     else :
         sys.exit("Error, type {} undefined".format(datatype)) 
     return data

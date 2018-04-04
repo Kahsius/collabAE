@@ -1,6 +1,9 @@
+import pandas as pd
+import timeit
 import sys
 import pdb
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 import sklearn.cluster as cluster
@@ -9,6 +12,7 @@ from copy import deepcopy
 from itertools import tee
 from collections import Counter 
 from torch.autograd import Variable
+from sklearn.ensemble import RandomForestClassifier
 
 from libCollabAEClasses import *
 from libCollabAEUtils import *
@@ -64,21 +68,29 @@ def learn_AENet(args):
                 test_fail = 0
                 min_model = deepcopy(net)
 
+            optimizer.zero_grad()
             for chunk in copy_dataset :
-                optimizer.zero_grad()
-                
                 # Train information
                 outputs = net(chunk)
                 loss = criterion(outputs, chunk)
 
                 # Parameters optimization
                 loss.backward()
-                optimizer.step()
-                scheduler.step(loss.data[0])
+            optimizer.step()
+            scheduler.step(loss.data[0])
 
         outputs = net(dataset_test)
         loss = criterion(outputs, dataset_test)
         print("\tView " + str(id_net) + " - test loss (MSE) : " + str(loss.data[0]))
+
+        if isinstance(dataset, str):
+            copy_dataset = iter([Variable(torch.from_numpy(pd.read_csv(dataset).values).float())])
+        else :
+            copy_dataset = iter([dataset])
+
+        outputs = net.encode(next(copy_dataset))
+        pd.DataFrame(outputs.data.numpy()).to_csv("data/fma/code"+str(id_net)+".csv", index=False)
+
 
         return net, loss.data[0]
 
@@ -97,11 +109,8 @@ def learn_LinkNet(args):
         data_test_in = args["test_in"]
         data_test_out = args["test_out"]
 
-
         # Modification de dataset_test pour récupérer les dimensions
         if isinstance(data_in, str):
-            # copy_data_in = tee(data_in, 1)[0]
-            # copy_data_out = tee(data_out, 1)[0]
             copy_data_in = get_iterator(data_in, options["CHUNKSIZE"], "float")
             copy_data_out = get_iterator(data_out, options["CHUNKSIZE"], "float")
         else :
@@ -125,8 +134,6 @@ def learn_LinkNet(args):
         for epoch in range(options["NSTEPS"]):
             # Modification de dataset_test pour gérer les itérables
             if isinstance(data_in, str):
-               # copy_data_in = tee(data_in, 1)[0]
-               # copy_data_out = tee(data_out, 1)[0]
                 copy_data_in = get_iterator(data_in, options["CHUNKSIZE"], "float")
                 copy_data_out = get_iterator(data_out, options["CHUNKSIZE"], "float")
             else :
@@ -331,8 +338,6 @@ def learn_weights_code4(args):
 
     NVIEWS = len(codes)
 
-    print(codes)
-
     # TESTING THE RECONSTRUCTION
     # PROTO WEIGTHING WITH GRAD
     w = torch.FloatTensor(NVIEWS, test_dataset.shape[1]).zero_()+1/(NVIEWS-1)
@@ -350,9 +355,7 @@ def learn_weights_code4(args):
         
         for epoch in range(options["NSTEPS_WEIGHTS"]):
             if isinstance(codes[0], str):
-                # codes_tmp = [tee(code, 1)[0] for code in codes]
                 codes_tmp = [get_iterator(code, options["CHUNKSIZE"], "float") for code in codes]
-                # train_dataset_tmp = tee(train_dataset, 1)[0]
                 train_dataset_tmp = get_iterator(train_dataset, options["CHUNKSIZE"], "float")
             else :
                 codes_tmp = [iter([code]) for code in codes]
@@ -386,18 +389,17 @@ def learn_weights_code4(args):
                 scheduler.step(loss.data[0])
 
 
-    # weights = normalize_weights(weights, id_view)
     indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
     loss = criterion(indiv_reconstruit, test_dataset)
     # loss2 = crit_per_feature(indiv_reconstruit, test_dataset)
     # mean_per_feat = torch.mean(torch.abs(test_dataset), dim=0).data
     # delta = torch.abs((loss2 - mean_per_feat)/mean_per_feat)
     l = torch.abs((test_dataset - indiv_reconstruit)/test_dataset)
-    # print(l)
 
     l = torch.median(l)
     print("\tReconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
-    print("\tWeights view : " + str(weights[:,:]))
+    if options["PRINT_WEIGHTS"]:
+        print("\tWeights view : " + str(weights[:,:]))
     # print("\tMean Relative Error : " + str(l.data.numpy()[0]))
     return weights, (loss.data[0], l.data[0])
 
@@ -573,13 +575,49 @@ def learnCollabSystem3(train_datasets, test_datasets, options) :
 
 # =====================================================================
 
+def learn_RandomForest(args):
+    i = args["id_in"]
+    options = args["options"]
+    dimData_out = options["nLabels"]
+
+    data_in = args["data_in"]
+    data_out = args["data_out"]
+    data_test_in = args["test_in"]
+    data_test_out = args["test_out"]
+
+    print("Learn Classifier " + str(i))
+
+    # Modification de dataset_test pour récupérer les dimensions
+    if isinstance(data_in, str):
+        data_in = pd.read_csv(data_in).values
+        data_out = np.ravel(pd.read_csv(data_out).values)
+    else :
+        data_in = data_in.data.numpy()
+        data_out = np.ravel(data_out.data.numpy())
+    data_test_in = data_test_in.data.numpy()
+    data_test_out = np.ravel(data_test_out.data.numpy())
+    dimData_in = data_in.shape[1]
+
+    classif = RandomForestClassifier(n_jobs=-1, n_estimators = 50, max_depth=5, criterion="entropy")
+    classif.fit(data_in, data_out)
+    
+    # Classification of the test samples
+    results = classif.predict(data_test_in)
+    results = np.sum(np.equal(results, data_test_out))/len(results)
+
+    print("Classifier " + str(i) + " : " + str(results))
+
+    return classif, results
+
+# =====================================================================
+
 def learnCollabSystem4(train_datasets, test_datasets, options) :
 
     results = {}
 
     # PARAMETERS
     NVIEWS = len(train_datasets)
-
+    
     if "train_labels" in options :
         print("Learning classifiers...")
         train_labels = options["train_labels"]
@@ -597,7 +635,11 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
 
         args = get_args_to_map_classifiers(train_datasets, test_datasets, train_labels, test_labels, options)
         # clusterings = list(learn_Clustering(arg) for arg in args)
-        classifiers = list(learn_ClassifierNet(arg) for arg in args)
+        # classifiers = list(learn_ClassifierNet(arg) for arg in args)
+        # classifiers = list(learn_RandomForest(arg) for arg in args)
+        classifiers = list()
+        for i in range(NVIEWS):
+            classifiers.append(learn_RandomForest(args[i]))
         classifiers, results["error_classifiers_test"] = extract_results(classifiers)
 
     # LEARNING ALL THE MODELS AND GET THE CODES
@@ -614,17 +656,11 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
 
             # Codes gathering
         if isinstance(train, str):
-            code = map(lambda chunk: models[i].encode(chunk), train)
-            code = map(lambda chunk : Variable(code.data, requires_grad = False))
-
-            code_test = map(lambda chunk: models[i].encode(chunk), train)
-            code_test = map(lambda chunk : Variable(code.data, requires_grad = False))
+            code = "data/fma/code"+str(i)+".csv"
         else :
             code = models[i].encode(train)
             code = Variable(code.data, requires_grad = False)
-
-            code_test = models[i].encode(test)
-            code_test = Variable(code_test.data, requires_grad = False)
+        code_test = Variable(models[i].encode(test).data, requires_grad = False)
         codes.append(code)
         codes_test.append(code_test)
 
@@ -652,11 +688,11 @@ def learnCollabSystem4(train_datasets, test_datasets, options) :
     print("Classification of the reconstruction")
     results["error_classifiers_final_test"] = []
     for i in range(NVIEWS):
-        output = cs.forward(i, test_datasets)
-        output1 = classifiers[i].getClasses(output)
-        output1 = torch.sum(torch.eq(output1, test_labels)).float()/len(test_labels)
-        results["error_classifiers_final_test"].append(output1.data[0])
-        print("\tAccuracy view " + str(i) + " : " + str(output1.data[0]))
+        output = cs.forward(i, test_datasets).data.numpy()
+        output1 = classifiers[i].predict(output)
+        output1 = np.sum(np.equal(output1, np.ravel(test_labels.data.numpy())))/len(output1)
+        results["error_classifiers_final_test"].append(output1)
+        print("\tAccuracy view " + str(i) + " : " + str(output1))
 
     return results
 

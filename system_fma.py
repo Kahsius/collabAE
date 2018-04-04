@@ -12,22 +12,22 @@ import pandas as pd
 
 # OPTIONS
 VERBOSE = True
-VERBOSE_STEP = 100
+VERBOSE_STEP = 1
 BIG_TEST = False
 BIG_TEST_ITER = 20
 
 # HYPERPARAMETERS
-NSTEPS = 500
-NSTEPS_WEIGHTS = 500
-CHUNKSIZE = 1000
+NSTEPS = 1000
+NSTEPS_WEIGHTS = 1000
+CHUNKSIZE = 0
 
 NOISY_ON_DATA = False
 
-LAYERS_AE = [50, 10]
-LAYERS_LINKS = [50]
+LAYERS_AE = [80]
+LAYERS_LINKS = [80]
 LAYERS_CLASSIF = [50]
 
-LEARNING_RATE_AE = 0.04
+LEARNING_RATE_AE = 0.09
 LEARNING_RATE_LINKS = 0.05
 LEARNING_RATE_CLASSIF = 0.05
 LEARNING_RATE_WEIGHTS = 0.01
@@ -49,10 +49,10 @@ train_datasets = []
 test_datasets = []
 
 for column in columns :
-#    data = pd.read_csv("data/fma/"+column+"_train.csv",
-#        chunksize=CHUNKSIZE)
-#    data = map(lambda chunk: Variable(torch.from_numpy(chunk.values).float()), data)
-    data = "data/fma/"+column+"_train.csv"
+    if CHUNKSIZE == 0 :
+        data = Variable(torch.from_numpy(pd.read_csv("data/fma/"+column+"_train.csv").values).float())
+    else :
+        data = "data/fma/"+column+"_train.csv"
     train_datasets.append(data)
 
     data = pd.read_csv("data/fma/"+column+"_test.csv")
@@ -60,10 +60,10 @@ for column in columns :
 
 NVIEWS = len(columns)
 
-train_labels = "data/fma/labels_train.csv"
-#train_labels = pd.read_csv("data/fma/labels_train.csv",
-#    chunksize=CHUNKSIZE)
-#train_labels = map(lambda chunk: Variable(torch.from_numpy(chunk.values).squeeze().long()), train_labels)
+if CHUNKSIZE == 0 :
+    train_labels = Variable(torch.from_numpy(pd.read_csv("data/fma/labels_train.csv").values).squeeze().long())
+else :
+    train_labels = "data/fma/labels_train.csv"
 test_labels = Variable(torch.from_numpy(pd.read_csv("data/fma/labels_test.csv").values).squeeze().long())
 
 options = {

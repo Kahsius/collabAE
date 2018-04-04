@@ -1,3 +1,5 @@
+#!/home/denis/python/collabAE/bin/python3
+
 from libCollabAELearn import *
 
 import pandas as pd
@@ -20,19 +22,16 @@ NOISY_VIEW_0 = False
 NVIEWS = 3
 PTEST = .1
 
-NSTEPS = 2000
+NSTEPS = 10000
 NSTEPS_WEIGHTS = 2000
 
 LOSS_METHOD = nn.MSELoss()
-# LOSS_METHOD = new_loss
 
-LAYERS_AE = [15]
-LAYERS_LINKS = [15, 10]
-LAYERS_CLASSIF = [10]
+LAYERS_AE = [35]
+LAYERS_LINKS = [55]
 
 LEARNING_RATE_AE = 0.02
 LEARNING_RATE_LINKS = 0.05
-LEARNING_RATE_CLASSIF = 0.03
 LEARNING_RATE_WEIGHTS = 0.05
 
 LEARN_WEIGHTS = True
@@ -42,14 +41,14 @@ PATIENCE = 200
 version = 4
 clampOutput = False if version == 4 else True
 
-data = pd.read_csv("data/wdbc/wdbc.data", header=None).values[:,2:]
+data = pd.read_csv("./data/musk/clean2.data", header=None).values[:,2:]
 data = np.array(data, dtype='float')
 if NOISY_ON_DATA :
 	data += np.random.normal(size=data.shape, scale=1)
 data = scale(data)
 
-labels = pd.read_csv("data/wdbc/wdbc.data", header=None).values[:,1]
-labels, names_labels = labels_as_matrix(labels)
+labels = data[:,-1]
+data = data[:,:-1]
 
 np.random.seed(np.random.randint(10000))
 state = np.random.get_state()
@@ -99,11 +98,9 @@ options = {
 	"NSTEPS_WEIGHTS"        : NSTEPS_WEIGHTS,
 	"LAYERS_AE"             : LAYERS_AE,
 	"LAYERS_LINKS"          : LAYERS_LINKS,
-	"LAYERS_CLASSIF"        : LAYERS_CLASSIF,
 	"LEARNING_RATE_AE"      : LEARNING_RATE_AE,
 	"LEARNING_RATE_LINKS"   : LEARNING_RATE_WEIGHTS,
 	"LEARNING_RATE_WEIGHTS" : LEARNING_RATE_WEIGHTS,
-	"LEARNING_RATE_CLASSIF" : LEARNING_RATE_CLASSIF,
 	"MOMENTUM"              : MOMENTUM,
 	"PATIENCE"              : PATIENCE,
 	"LEARN_WEIGHTS"         : LEARN_WEIGHTS,
@@ -121,7 +118,7 @@ elif version == 4 or version == 5:
 	if BIG_TEST :
 		for i in range(BIG_TEST_ITER) :
 			results = learnCollabSystem4(train_datasets, test_datasets, options)
-			f = "data/wdbc/results_sans_weights/results_" + str(i)
+			f = "data/musk/results_standar/results_" + str(i)
 			f = open(f, "w+b")
 			pickle.dump(results, f)
-			W.close()
+			f.close()

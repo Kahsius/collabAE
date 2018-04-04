@@ -7,22 +7,22 @@ import time
 
 from sklearn.preprocessing import scale
 
-VERBOSE = False
-VERBOSE_STEP = 100
-BIG_TEST = True
+VERBOSE = True
+VERBOSE_STEP = 1
+BIG_TEST = False
 BIG_TEST_ITER = 20
 
 # HYPERPARAMETERS
-NSTEPS = 5000
-NSTEPS_WEIGHTS = 2000
+NSTEPS = 10000
+NSTEPS_WEIGHTS = 2
 
 NOISY_ON_DATA = True
 
-LAYERS_AE = [150, 20]
+LAYERS_AE = [150]
 LAYERS_LINKS = [150]
 LAYERS_CLASSIF = [150]
 
-LEARNING_RATE_AE = 0.04
+LEARNING_RATE_AE = 0.15
 LEARNING_RATE_LINKS = 0.05
 LEARNING_RATE_CLASSIF = 0.05
 LEARNING_RATE_WEIGHTS = 0.01
@@ -75,25 +75,26 @@ NVIEWS = len(train_datasets)
 # print("\n")
 
 options = {
-    "VERBOSE" : VERBOSE,
-    "VERBOSE_STEP" : VERBOSE_STEP,
-    "NSTEPS" : NSTEPS,
-    "NSTEPS_WEIGHTS" : NSTEPS_WEIGHTS,
-    "LAYERS_AE" : LAYERS_AE,
-    "LAYERS_LINKS" : LAYERS_LINKS,
-    "LAYERS_CLASSIF" : LAYERS_CLASSIF,
-    "LEARNING_RATE_AE" : LEARNING_RATE_AE,
-    "LEARNING_RATE_LINKS" : LEARNING_RATE_WEIGHTS,
+    "VERBOSE"               : VERBOSE,
+    "VERBOSE_STEP"          : VERBOSE_STEP,
+    "NSTEPS"                : NSTEPS,
+    "NSTEPS_WEIGHTS"        : NSTEPS_WEIGHTS,
+    "LAYERS_AE"             : LAYERS_AE,
+    "LAYERS_LINKS"          : LAYERS_LINKS,
+    "LAYERS_CLASSIF"        : LAYERS_CLASSIF,
+    "LEARNING_RATE_AE"      : LEARNING_RATE_AE,
+    "LEARNING_RATE_LINKS"   : LEARNING_RATE_WEIGHTS,
     "LEARNING_RATE_WEIGHTS" : LEARNING_RATE_WEIGHTS,
     "LEARNING_RATE_CLASSIF" : LEARNING_RATE_CLASSIF,
-    "MOMENTUM" : MOMENTUM,
-    "PATIENCE" : PATIENCE,
-    "LEARN_WEIGHTS" : LEARN_WEIGHTS,
-    "LOSS_METHOD" : LOSS_METHOD,
-    "train_labels" : train_labels,
-    "test_labels" : test_labels,
-    "clampOutput" : clampOutput,
-    "version" : version
+    "MOMENTUM"              : MOMENTUM,
+    "PATIENCE"              : PATIENCE,
+    "LEARN_WEIGHTS"         : LEARN_WEIGHTS,
+    "LOSS_METHOD"           : LOSS_METHOD,
+    "train_labels"          : train_labels,
+    "test_labels"           : test_labels,
+    "clampOutput"           : clampOutput,
+    "nLabels"               : 10,
+    "version"               : version
 }
 
 if version == 3 :
