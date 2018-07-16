@@ -1,22 +1,26 @@
+#!/home/denis/python/collabAE/bin/python
+
+import pickle
+import time
+import seaborn as sb
+import matplotlib.pylab as plt
 from libCollabAELearn import *
 
 import pandas as pd
 import numpy as np
-import pickle
-import time
 
 from sklearn.preprocessing import scale
 
 VERBOSE = True
-VERBOSE_STEP = 1
+VERBOSE_STEP = 100
 BIG_TEST = False
 BIG_TEST_ITER = 20
 
 # HYPERPARAMETERS
 NSTEPS = 10000
-NSTEPS_WEIGHTS = 2
+NSTEPS_WEIGHTS = 3000
 
-NOISY_ON_DATA = True
+NOISY_ON_DATA = False 
 
 LAYERS_AE = [150]
 LAYERS_LINKS = [150]
@@ -63,6 +67,14 @@ for file in ["fac", "fou", "kar", "mor", "pix", "zer"] :
     np.random.shuffle(data)
     train_datasets.append(Variable(torch.from_numpy(data[:-200,:]).float()))
     test_datasets.append(Variable(torch.from_numpy(data[-200:,:]).float()))
+    if file=="pix":
+        for i in range(200) :
+            image = test_datasets[4].data.numpy()[i]
+            image = image.reshape((16,15))
+            ax = sb.heatmap(image, cbar=False)
+            label = test_labels.data.numpy()[i]
+            plt.savefig('img/mfeat/num_train/'+str(i)+'-'+str(label)+'.png')
+            print("Figure " + str(i) + " saved")
 
 NVIEWS = len(train_datasets)
 
@@ -75,6 +87,7 @@ NVIEWS = len(train_datasets)
 # print("\n")
 
 options = {
+    "BASE"                  : "mfeat",
     "VERBOSE"               : VERBOSE,
     "VERBOSE_STEP"          : VERBOSE_STEP,
     "NSTEPS"                : NSTEPS,
@@ -90,6 +103,7 @@ options = {
     "PATIENCE"              : PATIENCE,
     "LEARN_WEIGHTS"         : LEARN_WEIGHTS,
     "LOSS_METHOD"           : LOSS_METHOD,
+    "PRINT_WEIGHTS"         : True,
     "train_labels"          : train_labels,
     "test_labels"           : test_labels,
     "clampOutput"           : clampOutput,
@@ -111,4 +125,12 @@ elif version == 4 or version == 5:
             f.close()
             print("End time : " + str(time.localtime()))
     else :
-        learnCollabSystem4(train_datasets, test_datasets, options)
+        results, cs = learnCollabSystem4(train_datasets, test_datasets, options)
+        images = cs.forward(4, test_datasets).data.numpy()
+        for i in range(200) :
+            image = images[i]
+            image = image.reshape((16,15))
+            ax = sb.heatmap(image, cbar=False)
+            label = test_labels.data.numpy()[i]
+            plt.savefig('img/mfeat/num/'+str(i)+'-'+str(label)+'.png')
+            print("Figure " + str(i) + " saved")

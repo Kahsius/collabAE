@@ -1,3 +1,4 @@
+import pdb
 import sys
 import pandas as pd
 import torch
@@ -33,112 +34,6 @@ def getWeightedInputCodes(i, codes, links, weights):
     code_moyen = ft.reduce(lambda x, y: x+y, w_codes)
 
     return code_moyen
-
-# =====================================================================
-
-def read_sparse(data_file_name):
-    """
-    svm_read_problem(data_file_name) -> [m, y, x]
-    Read LIBSVM-format data from data_file_name and return labels y
-    and data instances x. m is a mapping of instance id to index
-    in arrays x and y
-
-    """
-    prob_y = []
-    prob_x = []
-    map_ii = {}
-    i = 0
-    dimData = 0
-    for line in open(data_file_name):
-        #print(line)
-        if line[0] == "#":
-            k = int(line.split("\t")[1].strip("\n"))
-            map_ii[k] = i
-            i += 1
-        elif len(line) > 1:
-            line = line.split(" ", 1)
-        # In case an instance with all zero features
-            if len(line) == 1: 
-                prob_y += [int(line[0])]
-                prob_x += [{0:0}]
-                break
-            label, features = line
-            xi = {}
-            for e in features.split(" "):
-                ind, val = e.split(":")
-                dimData = max(dimData, int(ind))
-                xi[int(ind)] = float(val)
-            prob_y += [int(label)]
-            prob_x += [xi]
-
-    dataset = torch.FloatTensor(i, dimData+1).zero_()
-    for index, indiv in enumerate(prob_x):
-        for key in indiv:
-            dataset[index, key] = indiv[key]
-    dataset = Variable(dataset)
-
-    return (dataset, prob_y)
-
-# =====================================================================
-
-def read_sparse_to_pytorch(data_file_name):
-    """
-    svm_read_problem(data_file_name) -> [m, y, x]
-    Read LIBSVM-format data from data_file_name and return labels y
-    and data instances x. m is a mapping of instance id to index
-    in arrays x and y
-
-    """
-    indexes = torch.LongTensor([[0],[0]])
-    values = torch.FloatTensor([0])
-    labels = []
-    map_indexes = {}
-    i = 0
-    dimData = 0
-
-    list_indexes = []
-    list_values = []
-    for line in open(data_file_name):
-        if line[0] == "#":
-            k = int(line.split("\t")[1].strip("\n"))
-            map_indexes[k] = i
-            i += 1
-        elif len(line) > 1:
-            line = line.split(" ", 1)
-        # In case an instance with all zero features
-            if len(line) == 1: 
-                continue
-            label, features = line
-            labels += [int(label)]
-            features = features.split(" ")
-            indexes_tmp = torch.LongTensor(2,len(features)).zero_()
-            values_tmp = torch.FloatTensor(len(features)).zero_()
-            for index_feature, e in enumerate(features):
-                ind, val = e.split(":")
-                dimData = max(dimData, int(ind))
-                indexes_tmp[0,index_feature] = i-1
-                indexes_tmp[1,index_feature] = int(ind)
-                values_tmp[index_feature] = float(val.strip("\n"))
-            list_indexes.append(indexes_tmp)
-            list_values.append(values_tmp)
-
-    # indexes = ft.reduce(lambda x, y: torch.cat((x,y), 1), list_indexes)
-    # values = ft.reduce(lambda x, y: torch.cat((x,y), 0), list_values)
-
-    indexes = torch.cat(list_indexes, 1)
-    values = torch.cat(list_values, 0)
-
-    dataset = torch.sparse.FloatTensor(indexes, values, torch.Size([i,dimData+1]))
-
-    return (dataset, labels)
-
-# =====================================================================
-
-def number_lines_file(file_name):
-    with open(file_name) as f:
-        for i, l in enumerate(f):
-            pass
-        return i+1
 
 # =====================================================================
 
@@ -278,6 +173,30 @@ def get_weighted_outputs(i, codes, links, weights):
 
     data_moyen = ft.reduce(lambda x, y: x+y, w_output)
     return data_moyen
+
+# =====================================================================
+
+def update_weights(i, codes, target, links, weights):
+    new_weights = Variable(weights.data)
+    for j in range(len(codes)):
+        if j != i:
+            code_externe = codes[j]
+            data_interne = links[j][i](code_externe)
+            w_output = list()
+            for j2 in range(len(codes)):
+                if j2 != j and j2 != i:
+                    code_externe2 = codes[j2]
+                    data_interne2 = links[j2][i](code_externe2)
+                    data_interne2 *= weights[j2,:]
+                    w_output.append(data_interne2)
+            data_moyen = ft.reduce(lambda x, y: x+y, w_output)
+            delta = target - data_moyen
+            numerateur = data_interne * delta
+            numerateur = torch.sum(numerateur, dim=0)
+            denominateur = data_interne * data_interne
+            denominateur = torch.sum(denominateur, dim=0)
+            new_weights[j,:] = numerateur/denominateur
+    return new_weights
 
 # =====================================================================
 

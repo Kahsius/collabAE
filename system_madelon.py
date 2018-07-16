@@ -9,10 +9,10 @@ import pickle
 import sys
 from sklearn.preprocessing import scale
 
-VERBOSE = True
+VERBOSE = False
 VERBOSE_STEP = 100
 BIG_TEST = False
-BIG_TEST_ITER = 50
+BIG_TEST_ITER = 1
 PRINT_WEIGHTS = False
 
 # NOISE TYPE
@@ -23,15 +23,15 @@ NOISY_VIEW_0 = False
 # HYPERPARAMETERS
 NVIEWS = 4
 PTEST = .1
-NSTEPS = 1000
+NSTEPS = 9000
 NSTEPS_WEIGHTS = 2000
 LOSS_METHOD = nn.MSELoss()
-LAYERS_AE = [100]
-LAYERS_LINKS = [100, 100]
+LAYERS_AE = [200]
+LAYERS_LINKS = [100]
 LEARNING_RATE_AE = 0.05
 LEARNING_RATE_LINKS = 0.05
 LEARNING_RATE_WEIGHTS = 0.05
-LEARN_WEIGHTS = False
+LEARN_WEIGHTS = True
 MOMENTUM = 0.9
 PATIENCE = 200
 version = 4
@@ -111,19 +111,18 @@ options = {
     "clampOutput"           : clampOutput,
     "nLabels"               : 2,
     "version"               : version,
-    "PRINT_WEIGHTS"         : PRINT_WEIGHTS
+    "PRINT_WEIGHTS"         : PRINT_WEIGHTS,
+    "BASE"                  : "madelon"
 }
 if version == 3:
     learnCollabSystem3(train_datasets, test_datasets, options)
 elif version == 4 or version == 5:
-    results = learnCollabSystem4(train_datasets, test_datasets, options)
-    f = open("data/madelon/results_sans_weights/results", "w+b")
-    pickle.dump(results, f)
-    # if BIG_TEST:
-#         for i in range(BIG_TEST_ITER):
-            # results = learnCollabSystem4(train_datasets, test_datasets,
-                                         # options)
-            # f = "data/wdbc/results_sans_weights/results_" + str(i)
-            # f = open(f, "w+b")
-            # pickle.dump(results, f)
-            # W.close()
+    if not BIG_TEST:
+        learnCollabSystem4(train_datasets, test_datasets, options)
+    if BIG_TEST:
+        for i in range(BIG_TEST_ITER):
+            results = learnCollabSystem4(train_datasets, test_datasets,
+                                         options)
+            f = "data/madelon/results_standard/results_" + str(i)
+            f = open(f, "w+b")
+            pickle.dump(results, f)
