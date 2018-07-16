@@ -27,3 +27,4 @@ img/
 .pydevproject
 *.swp
 .exrc
+tags
