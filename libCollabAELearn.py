@@ -54,17 +54,17 @@ def learn_AENet(args):
         outputs = net(dataset_test)
         loss = criterion(outputs, dataset_test)
         if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_net == 0:
-            print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
+            print("Test Loss " + str(epoch) + " : " + str(loss.item()))
 
         # Stop when test error is increasing
-        if loss.data[0] >= min_test :
+        if loss.item() >= min_test :
             test_fail += 1
             if test_fail > options["PATIENCE"] :
                 if options["VERBOSE"] and id_net == 0: print("Stop : test error increasing")
                 net = deepcopy(min_model)
                 break
         else :
-            min_test = loss.data[0]
+            min_test = loss.item()
             test_fail = 0
             min_model = deepcopy(net)
 
@@ -77,14 +77,14 @@ def learn_AENet(args):
             # Parameters optimization
             loss.backward()
         optimizer.step()
-        scheduler.step(loss.data[0])
+        scheduler.step(loss.item())
 
     outputs = net.encode(dataset_test)
     pd.DataFrame(outputs.data.numpy()).to_csv("data/"+options["BASE"]+"/codtest"+str(id_net)+".csv", index=False)
 
     outputs = net(dataset_test)
     loss = criterion(outputs, dataset_test)
-    print("\tView " + str(id_net) + " - test loss (MSE) : " + str(loss.data[0]))
+    print("\tView " + str(id_net) + " - test loss (MSE) : " + str(loss.item()))
 
     if isinstance(dataset, str):
         copy_dataset = iter([Variable(torch.from_numpy(pd.read_csv(dataset).values).float())])
@@ -94,7 +94,7 @@ def learn_AENet(args):
     outputs = net.encode(next(copy_dataset))
     pd.DataFrame(outputs.data.numpy()).to_csv("data/"+options["BASE"]+"/code"+str(id_net)+".csv", index=False)
 
-    return net, loss.data[0]
+    return net, loss.item()
 
 # =====================================================================
 
@@ -146,17 +146,17 @@ def learn_LinkNet(args):
             outputs = net(data_test_in)
             loss = criterion(outputs, data_test_out)
             if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and i == 0 and j == 1:
-                print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
+                print("Test Loss " + str(epoch) + " : " + str(loss.item()))
 
             # Stop if test error is increasing
-            if loss.data[0] >= min_test :
+            if loss.item() >= min_test :
                 test_fail += 1
                 if test_fail > options["PATIENCE"] :
                     if options["VERBOSE"] and i == 0 : print("Stop : test error increasing")
                     net = deepcopy(min_model)
                     break
             else :
-                min_test = loss.data[0]
+                min_test = loss.item()
                 test_fail = 0
                 min_model = deepcopy(net)
 
@@ -170,13 +170,13 @@ def learn_LinkNet(args):
                 # Parameters optimization
                 loss.backward()
                 optimizer.step()
-                scheduler.step(loss.data[0])
+                scheduler.step(loss.item())
 
         outputs = net(data_test_in)
         loss = criterion(outputs, data_test_out)
-        print("\tLink " + str(i) + " ~ " + str(j) + " - test loss (MSE) : " + str(loss.data[0]))
+        print("\tLink " + str(i) + " ~ " + str(j) + " - test loss (MSE) : " + str(loss.item()))
 
-        return net, loss.data[0]
+        return net, loss.item()
 
 # =====================================================================
 
@@ -220,19 +220,19 @@ def learn_weights_code(args):
             indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
             loss = criterion(indiv_reconstruit, test_dataset)
 
-            if loss.data[0] > best_error :
+            if loss.item() > best_error :
                 test_fail += 1
                 if test_fail >= options["PATIENCE"] :
                     if options["VERBOSE"] and id_view == 0 : print("Stop : test error increasing")
                     weights = min_weights
                     break
             else :
-                best_error = loss.data[0]
+                best_error = loss.item()
                 test_fail = 0
                 min_weights = (Variable(weights.data, requires_grad=True))
 
             if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and id_view == 0:
-                print("Reconst. Test loss " + str(epoch) + " : " + str(loss.data[0]))
+                print("Reconst. Test loss " + str(epoch) + " : " + str(loss.item()))
 
             for chunk_codes in zip(*codes_tmp, train_dataset_tmp):
                 optimizer.zero_grad()
@@ -242,7 +242,7 @@ def learn_weights_code(args):
 
                 loss.backward()
                 optimizer.step()
-                scheduler.step(loss.data[0])
+                scheduler.step(loss.item())
 
 
     indiv_reconstruit = get_weighted_outputs(id_view, codes_test, links, weights)
@@ -253,11 +253,11 @@ def learn_weights_code(args):
     l = torch.abs((test_dataset - indiv_reconstruit)/test_dataset)
 
     l = torch.median(l)
-    print("\tReconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.data[0]))
+    print("\tReconstruction view " + str(id_view) + " - test loss (MSE) : " + str(loss.item()))
     if options["PRINT_WEIGHTS"]:
         print("\tWeights view : " + str(weights[:,:]))
     # print("\tMean Relative Error : " + str(l.data.numpy()[0]))
-    return weights, (loss.data[0], l.data[0])
+    return weights, (loss.item(), l.item())
 
 # =====================================================================
 
@@ -310,17 +310,17 @@ def learn_ClassifierNet(args):
         outputs = net(data_test_in)
         loss = criterion(outputs, data_test_out)
         if epoch % options["VERBOSE_STEP"] == 0 and options["VERBOSE"] and i == 0 :
-            print("Test Loss " + str(epoch) + " : " + str(loss.data[0]))
+            print("Test Loss " + str(epoch) + " : " + str(loss.item()))
 
         # Stop if test error is increasing
-        if loss.data[0] >= min_test :
+        if loss.item() >= min_test :
             test_fail += 1
             if test_fail > options["PATIENCE"] :
                 if options["VERBOSE"] and i == 0 : print("Stop : test error increasing")
                 net = deepcopy(min_model)
                 break
         else :
-            min_test = loss.data[0]
+            min_test = loss.item()
             test_fail = 0
             min_model = deepcopy(net)
 
@@ -334,11 +334,11 @@ def learn_ClassifierNet(args):
             # Parameters optimization
             loss.backward()
             optimizer.step()
-            scheduler.step(loss.data[0])
+            scheduler.step(loss.item())
 
     # outputs = net(data_test_in)
     # loss = criterion(outputs, data_test_out)
-    # print("\tClassifier " + str(i) + " - test loss : " + str(loss.data[0]))
+    # print("\tClassifier " + str(i) + " - test loss : " + str(loss.item()))
 
     predictions = net.getClasses(data_test_in)
     accuracy = torch.sum(torch.eq(predictions, data_test_out)).float()/len(data_test_out)

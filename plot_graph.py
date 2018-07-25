@@ -1,9 +1,12 @@
+#!/home/denis/python/collabAE/bin/python
+
 import pdb
 import sys
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 from results_wdbc import get_results
 matplotlib.rcParams.update({'font.size': 15})
@@ -54,6 +57,7 @@ def plot(g, gg, title, filename, name, g3=0):
 
     name2 = name.upper() if name != 'mfeat' else 'MFDD'
     name2 = 'Madelon' if name == 'madelon' else name2
+    name2 = 'Cube' if name == 'cube' else name2
     ax.set_xlabel('Views')
     ax.set_ylabel(title)
     ax.set_xticks(index + bar_width / 2)

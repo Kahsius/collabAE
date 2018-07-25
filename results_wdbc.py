@@ -3,6 +3,7 @@ import os
 import math
 import scipy.stats as stats
 import numpy as np
+import pdb
 
 def get_results(path) :
     list_results = os.listdir(path)
@@ -10,7 +11,8 @@ def get_results(path) :
     modif = 1.96/math.sqrt(K)
     # print("K : " + str(K))
 
-    data = pickle.load(open(path+list(list_results)[0], "r+b"))
+    pdb.set_trace()
+    data = pickle.load(open(path+list(list_results)[0], "r+b"))[0]
     NVIEWS = len(data["error_classifiers_test"])
     # print("NVIEWS : " + str(NVIEWS))
 
@@ -45,7 +47,7 @@ def get_results(path) :
 
     for filename in list_results :
         f = open(path+filename, "r+b")
-        data = pickle.load(f)
+        data = pickle.load(f)[0]
         for i in range(NVIEWS) :
             classifiers[i] += [data["error_classifiers_test"][i]]
             autoencoders[i] += [data["error_autoencoders_test"][i]]
@@ -74,22 +76,22 @@ def get_results(path) :
             links_ci[i][j] = var_to_ci(links_ci[i][j], modif)
 
 
-    # print("Classifiers : " + str(classifiers))
-    # print("Classifiers CI : " + str(classifiers_ci))
-    # print()
-    # print("Autoencoders : " + str(autoencoders))
-    # print("Autoencoders CI : " + str(autoencoders_ci))
-    # print()
-    # print("Links : " + str(links))
-    # print("Links CI : " + str(links_ci))
-    # print()
-    # print("Final MSE : " + str(final_mse))
-    # print("Final MSE CI : " + str(final_mse_ci))
-    # print()
-    # print("Final Relative Error : " + str(final_relative))
-    # print("Final Relative Error CI : " + str(final_relative_ci))
-    # print()
-    # print("Final Classifiers : " + str(final_classifiers))
-    # print("Final Classifiers CI : " + str(final_classifiers_ci))
+    print("Classifiers : " + str(classifiers))
+    print("Classifiers CI : " + str(classifiers_ci))
+    print()
+    print("Autoencoders : " + str(autoencoders))
+    print("Autoencoders CI : " + str(autoencoders_ci))
+    print()
+    print("Links : " + str(links))
+    print("Links CI : " + str(links_ci))
+    print()
+    print("Final MSE : " + str(final_mse))
+    print("Final MSE CI : " + str(final_mse_ci))
+    print()
+    print("Final Relative Error : " + str(final_relative))
+    print("Final Relative Error CI : " + str(final_relative_ci))
+    print()
+    print("Final Classifiers : " + str(final_classifiers))
+    print("Final Classifiers CI : " + str(final_classifiers_ci))
 
     return classifiers, classifiers_ci, autoencoders, autoencoders_ci, links, links_ci, final_mse, final_mse_ci, final_relative, final_relative_ci, final_classifiers, final_classifiers_ci

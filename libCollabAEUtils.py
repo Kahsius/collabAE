@@ -289,16 +289,3 @@ def get_iterator(filename, chunksize, datatype):
     return data
   
 
-
-
-
-
-
-
-
-
-
-
-
-
-
